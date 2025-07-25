@@ -83,36 +83,44 @@ def refresh_acft(data):
 
 
 def new_fpl(data):
-    callsign = data['callsign']
+    required_keys = ["callsign", "departing", "arriving", "aircraft"]
+
+    # Проверка необходимых ключей
+    if any(key not in data for key in required_keys):
+        print("Error: Missing required keys")
+        return
+
+    callsign = data["callsign"]
     print(f"fpl {callsign}")
-    data['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     plans = load_flight_plans()
     plans[callsign] = data
     save_flight_plans(plans)
 
-    departing = data['departing']
-    arriving = data['arriving']
+    departing = data["departing"]
+    arriving = data["arriving"]
 
-    flight_info = {
-        'callsign': callsign,
-        'aircraft': data['aircraft'],
-        'arriving': arriving,
-        'status': 'scheduled',
-        'live': False,
-        'state': 0
+    # Продолжаем создание рейсов
+    flight_info_departure = {
+        "callsign": callsign,
+        "aircraft": data["aircraft"],
+        "arriving": arriving,
+        "status": "scheduled",
+        "live": False,
+        "state": 0
     }
-    flights_data['departures'][departing].append(flight_info)
+    flights_data["departures"][departing].append(flight_info_departure)
 
-    flight_info = {
-        'callsign': callsign,
-        'aircraft': data['aircraft'],
-        'departing': departing,
-        'status': 'scheduled',
-        'live': False,
-        'state': 0
+    flight_info_arrival = {
+        "callsign": callsign,
+        "aircraft": data["aircraft"],
+        "departing": departing,
+        "status": "scheduled",
+        "live": False,
+        "state": 0
     }
-    flights_data['arrivals'][arriving].append(flight_info)
+    flights_data["arrivals"][arriving].append(flight_info_arrival)
 
 
 def get_sorted_airports():
@@ -296,6 +304,26 @@ HTML_TEMPLATE = """
         .flight-card.live {
             border-left-color: var(--live-accent);
         }
+        
+        .flight-card {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.1s ease-in-out;
+}
+.flight-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    height: 100%;
+    background-color: #2e3a42; /* Голубой цвет */
+    z-index: -1;
+    transition: width 0.1s ease-in-out;
+}
+.flight-card:hover::before {
+    width: 100%; /* Полностью покрывает карточку */
+}
     </style>
 </head>
 <body>
@@ -395,8 +423,8 @@ HTML_TEMPLATE = """
 
 def icon_for_state(state):
     icons = {
-        0: 'ground.png',
-        1: 'departure.png',
+        0: 'boarding.png',
+        1: 'departure1.png',
         2: 'departure.png',
         3: 'cruise.png',
         4: 'arrival.png',
@@ -431,13 +459,13 @@ def index():
     flights_data['departures'] = defaultdict(list)
     flights_data['arrivals'] = defaultdict(list)
 
+    # print([acft.lower().replace('-', ' ').replace(' ', '-') for acft in flights_data['aircrafts']])
+
     # Обрабатываем каждый flight plan
     for callsign, plan in flight_plans.items():
         if not all(key in plan for key in ['departing', 'arriving', 'aircraft']):
             continue
         flight_level = str(plan.get('flightlevel', '0')).replace('FL', '').strip()
-
-        print(plan.get('realcallsign', callsign).replace('-', ' ').replace(' ', '-').lower(), plan.get('realcallsign', callsign).replace('-', ' ').replace(' ', '-').lower() in [acft.lower().replace('-', ' ').replace(' ', '-') for acft in flights_data['aircrafts']])
 
         flight_info = {
             'callsign': callsign,
@@ -517,19 +545,21 @@ def get_flight_state(callsign, acft_data, fpl=None):
 
     if speed > 10 and is_on_ground and prev_state == 0:
         new_state = 1  # Руление
-        print(new_state, callsign)
-    if not is_on_ground and altitude < (flight_level - 300) and prev_state < 2:
+        # print(new_state, callsign)
+    if not is_on_ground and prev_state == 1:
         new_state = 2  # Набор высоты
-        print(new_state, callsign)
+        # print(new_state, callsign)
     if not is_on_ground and flight_level - 300 < altitude and (prev_state == 2):
         new_state = 3  # Крейсерский полет
-        print(new_state, callsign)
+        # print(new_state, callsign)
     if not is_on_ground and altitude < (flight_level - 500) and prev_state != 1:
         new_state = 4  # Снижение
-        print(new_state, callsign)
+        # print(new_state, callsign)
     if is_on_ground and speed < 30 and prev_state == 4:
         new_state = 5  # Посадка
-        print(new_state, callsign)
+        # print(new_state, callsign)
+
+    # print(prev_state, new_state, callsign, speed, is_on_ground, altitude, flight_level)
 
     # Если предыдущего состояния нет - сохраняем текущее
     if prev_state is None and new_state is not None:
@@ -555,17 +585,17 @@ def update_flight_statuses():
 
         for airport in flights_data['departures']:
             for flight in flights_data['departures'][airport]:
-                if flight['realcallsign'] == callsign:
+                if flight.get('realcallsign', 'callsign') == callsign:
                     flight['live'] = True
                     flight['state'] = get_flight_state(callsign, acft_data)
-                    print(f"Updated flight status for {callsign}: live={flight['live']}, state={flight['state']}")
+                    # print(f"Updated flight status for {callsign}: live={flight['live']}, state={flight['state']}")
 
         for airport in flights_data['arrivals']:
             for flight in flights_data['arrivals'][airport]:
-                if flight['realcallsign'] == callsign:
+                if flight.get('realcallsign', 'callsign') == callsign:
                     flight['live'] = True
                     flight['state'] = get_flight_state(callsign, acft_data)
-                    print(f"Updated flight status for {callsign}: live={flight['live']}, state={flight['state']}")
+                    # print(f"Updated flight status for {callsign}: live={flight['live']}, state={flight['state']}")
 
 
 async def websocket_listener():
@@ -580,6 +610,8 @@ async def websocket_listener():
                         refresh_acft(data['d'])
                     elif data['t'] == "FLIGHT_PLAN":
                         new_fpl(data['d'])
+
+                    update_flight_statuses()
         except Exception as e:
             print(f"WebSocket error: {e}")
             await asyncio.sleep(5)
