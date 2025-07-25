@@ -67,7 +67,7 @@ def cleanup_old_plans():
             continue
 
         plan_time = datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S')
-        if (now - plan_time) < timedelta(minutes=30):
+        if (now - plan_time) < timedelta(minutes=90):
             updated_plans[callsign] = plan
 
     if len(updated_plans) != len(plans):
