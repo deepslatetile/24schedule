@@ -348,7 +348,7 @@ HTML_TEMPLATE = """
                     
                     <!-- Информация о состоянии рейса -->
                     <div class="flight-state-icon">
-                        <img src="/static/{{ flight.state | icon_for_state }}" alt="Flight State Icon" title="{{ flight.state | description_for_state }}"/>
+                        <img src="{{ flight.state | icon_for_state }}" alt="Flight State Icon" title="{{ flight.state | description_for_state }}"/>
                     </div>
                     
                     <!-- Маршрут и название самолета -->
@@ -388,7 +388,7 @@ HTML_TEMPLATE = """
                     
                     <!-- Информация о состоянии рейса -->
                     <div class="flight-state-icon">
-                        <img src="/static/{{ flight.state | icon_for_state }}" alt="Flight State Icon" title="{{ flight.state | description_for_state }}"/>
+                        <img src="{{ flight.state | icon_for_state }}" alt="Flight State Icon" title="{{ flight.state | description_for_state }}"/>
                     </div>
                     
                     <!-- Маршрут и название самолета -->
