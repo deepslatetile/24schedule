@@ -423,12 +423,12 @@ HTML_TEMPLATE = """
 
 def icon_for_state(state):
     icons = {
-        0: 'https://github.com/deepslatetile/24schedule/blob/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/boarding.png',
-        1: 'https://github.com/deepslatetile/24schedule/blob/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/departure1.png',
-        2: 'https://github.com/deepslatetile/24schedule/blob/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/departure.png',
-        3: 'https://github.com/deepslatetile/24schedule/blob/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/cruise.png',
-        4: 'https://github.com/deepslatetile/24schedule/blob/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/arrival.png',
-        5: 'https://github.com/deepslatetile/24schedule/blob/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/ground.png'
+        0: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/boarding.png',
+        1: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/departure1.png',
+        2: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/departure.png',
+        3: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/cruise.png',
+        4: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/arrival.png',
+        5: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/ground.png'
     }
     return icons.get(state, '')
 
