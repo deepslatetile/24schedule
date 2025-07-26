@@ -56,6 +56,22 @@ def save_flight_plans(plans):
         json.dump(plans, f)
 
 
+def get_recent_flight_plans():
+    plans = load_flight_plans()
+    now = datetime.now()
+    recent_plans = {}
+    
+    for callsign, plan in plans.items():
+        try:
+            plan_time = datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S')
+            if (now - plan_time) <= timedelta(minutes=120):
+                recent_plans[callsign] = plan
+        except (KeyError, ValueError):
+            continue
+    
+    return recent_plans
+    
+
 def cleanup_old_plans():
     now = datetime.now()
     plans = load_flight_plans()
@@ -452,7 +468,7 @@ app.jinja_env.filters['description_for_state'] = description_for_state
 @app.route('/')
 def index():
     # Загружаем актуальные flight plans
-    flight_plans = cleanup_old_plans()
+    flight_plans = get_recent_flight_plans()
     current_time = datetime.now()
 
     # Очищаем предыдущие данные
