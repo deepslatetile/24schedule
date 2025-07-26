@@ -44,6 +44,38 @@ flights_data = {
 FLIGHT_PLANS_FILE = 'flight_plans.json'
 
 
+import requests
+import json
+
+def wh_log(message_text):
+    # Замените эту ссылку на ваш вебхук
+    WEBHOOK_URL = "https://discord.com/api/webhooks/1398545462310735922/rrjxryjo59vDVtYIScwOomSjvFPPp2Y1lDhupxO2c5JR4u4wRv_ct03oxunXqS2IOMEI"
+    
+    try:
+        # Подготавливаем данные для отправки
+        payload = {
+            "content": message_text,
+        }
+        
+        # Отправляем POST-запрос
+        response = requests.post(
+            WEBHOOK_URL,
+            data=json.dumps(payload),
+            headers={"Content-Type": "application/json"}
+        )
+        
+        # Проверяем успешность запроса
+        if response.status_code in [200, 204]:
+            return True
+        else:
+            print(f"Webhook error: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"Error sending to webhook: {str(e)}")
+        return False
+        
+
 def load_flight_plans():
     if os.path.exists(FLIGHT_PLANS_FILE):
         with open(FLIGHT_PLANS_FILE, 'r') as f:
@@ -99,8 +131,12 @@ def refresh_acft(data):
 
 
 def new_fpl(data):
+    wh_log(f'fpl {data["callsign"]}')
     required_keys = ["callsign", "departing", "arriving", "aircraft"]
 
+    # Нормализуем callsign
+    data["callsign"] = data["callsign"].replace("-", "").replace(" ", "").upper()
+    
     # Проверка необходимых ключей
     if any(key not in data for key in required_keys):
         print("Error: Missing required keys")
@@ -122,7 +158,6 @@ def new_fpl(data):
         "callsign": callsign,
         "aircraft": data["aircraft"],
         "arriving": arriving,
-        "status": "scheduled",
         "live": False,
         "state": 0
     }
@@ -132,7 +167,6 @@ def new_fpl(data):
         "callsign": callsign,
         "aircraft": data["aircraft"],
         "departing": departing,
-        "status": "scheduled",
         "live": False,
         "state": 0
     }
@@ -475,23 +509,23 @@ def index():
     flights_data['departures'] = defaultdict(list)
     flights_data['arrivals'] = defaultdict(list)
 
-    # print([acft.lower().replace('-', ' ').replace(' ', '-') for acft in flights_data['aircrafts']])
-
     # Обрабатываем каждый flight plan
     for callsign, plan in flight_plans.items():
         if not all(key in plan for key in ['departing', 'arriving', 'aircraft']):
             continue
+        
+        # Нормализуем callsign
+        callsign = callsign.replace("-", "").replace(" ", "").upper()
         flight_level = str(plan.get('flightlevel', '0')).replace('FL', '').strip()
 
         flight_info = {
             'callsign': callsign,
-            'realcallsign': plan.get('realcallsign', callsign),
             'aircraft': plan['aircraft'],
             'flightlevel': flight_level,
             'playerName': plan.get('robloxName', 'Unknown'),
             'timestamp': plan['timestamp'],
             'time': datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M'),
-            'live': plan.get('realcallsign', callsign).replace('-', ' ').replace(' ', '-').lower() in [acft.lower().replace('-', ' ').replace(' ', '-') for acft in flights_data['aircrafts']],
+            'live': callsign in [acft.replace("-", "").replace(" ", "").upper() for acft in flights_data['aircrafts']],
             'is_local': plan['departing'] == plan['arriving'],
             'departing_name': AIRPORTS.get(plan['departing'], {}).get('name', plan['departing']),
             'arriving_name': AIRPORTS.get(plan['arriving'], {}).get('name', plan['arriving'])
@@ -533,14 +567,31 @@ def index():
     )
 
 
-def get_flight_state(callsign, acft_data, fpl=None):
+def get_flight_state(callsign, acft_data):
     """Определяет state со строгой последовательностью переходов"""
     if not acft_data:
-        print(f'no acft data for {callsign}')
+        wh_log(f"{callsign} check: No aircraft data")
+        return None
+
+    # Нормализуем callsign для поиска в flight plans
+    normalized_callsign = callsign.replace("-", "").replace(" ", "").upper()
+    
+    # Загружаем flight plans
+    flight_plans = load_flight_plans()
+    
+    # Ищем flight plan с нормализованным callsign
+    fpl = None
+    for plan_callsign, plan in flight_plans.items():
+        if plan_callsign.replace("-", "").replace(" ", "").upper() == normalized_callsign:
+            fpl = plan
+            break
+
+    if not fpl:
+        wh_log(f"{normalized_callsign} check: Flight plan not found")
         return None
 
     # Получаем предыдущее состояние
-    prev_state = flights_data['flight_states'].get(callsign)
+    prev_state = flights_data['flight_states'].get(normalized_callsign, 0)
 
     # Извлекаем данные о самолете
     speed = acft_data.get('speed', 0)
@@ -548,71 +599,78 @@ def get_flight_state(callsign, acft_data, fpl=None):
     altitude = acft_data.get('altitude', 0)
 
     # Определяем целевой flight level из плана полета
-    if fpl:
-        try:
-            flight_level = int(fpl.get('flightlevel', '0').replace('FL', '')) * 100
-        except:
-            flight_level = 0
-    else:
+    flight_level = 0
+    try:
+        flight_level = int(fpl["flightlevel"]) * 100
+    except:
         flight_level = 0
+        wh_log(f"{normalized_callsign} check: Invalid flight level in FPL: {fpl.get('flightlevel', 'N/A')}")
 
-    # Определяем RAW состояние без учета предыдущего
-    new_state = prev_state if prev_state is not None else 0
+    # Логируем параметры перед определением состояния
+    log_message = (
+        f"{normalized_callsign}\n"
+        f"FPL FL: {flight_level}ft, "
+        f"{altitude}ft "
+        f"{speed}kts "
+        f"{is_on_ground} "
+        f"{prev_state}\n"
+    )
+    print(log_message)
 
-    if speed > 10 and is_on_ground and prev_state == 0:
-        new_state = 1  # Руление
-        # print(new_state, callsign)
-    if not is_on_ground and prev_state == 1:
-        new_state = 2  # Набор высоты
-        # print(new_state, callsign)
-    if not is_on_ground and flight_level - 300 < altitude and (prev_state == 2):
-        new_state = 3  # Крейсерский полет
-        # print(new_state, callsign)
-    if not is_on_ground and altitude < (flight_level - 500) and prev_state != 1:
-        new_state = 4  # Снижение
-        # print(new_state, callsign)
-    if is_on_ground and speed < 30 and prev_state == 4:
-        new_state = 5  # Посадка
-        # print(new_state, callsign)
+    # Определяем новое состояние
+    new_state = prev_state
 
-    # print(prev_state, new_state, callsign, speed, is_on_ground, altitude, flight_level)
+    if is_on_ground:
+        if speed > 10 and prev_state == 0:
+            new_state = 1  # departing
+        elif speed < 30 and prev_state in [2, 3, 4]:
+            new_state = 5  # landed
+    else:
+        if prev_state == 1:
+            new_state = 2  # climbing
+        elif prev_state == 2 and altitude > (flight_level - 300):
+            new_state = 3  # cruise
+        elif prev_state == 3 and altitude < (flight_level - 400):
+            new_state = 4  # descending
 
-    # Если предыдущего состояния нет - сохраняем текущее
-    if prev_state is None and new_state is not None:
-        flights_data['flight_states'][callsign] = new_state
-        return new_state
+    # Логируем результат проверки состояния
+    if new_state != prev_state:
+        state_change_msg = (
+            f"{normalized_callsign} STATE CHANGE: "
+            f"{prev_state}->{new_state} | "
+            f"FL: {flight_level}ft | "
+            f"Alt: {altitude}ft | "
+            f"Speed: {speed}kts | "
+            f"OnGround: {is_on_ground}"
+        )
+        print(state_change_msg)
+        flights_data['flight_states'][normalized_callsign] = new_state
+    else:
+        #print(f"{normalized_callsign} state remains {prev_state}")
+        pass
 
-    # Если состояние не изменилось - возвращаем предыдущее
-    if new_state == prev_state:
-        return prev_state
-
-    # Разрешаем переход только на следующее состояние
-    if new_state is not None:
-        if new_state == prev_state + 1:
-            flights_data['flight_states'][callsign] = new_state
-            return new_state
-
-    # Во всех остальных случаях возвращаем предыдущее состояние
-    return prev_state
+    return new_state
 
 
 def update_flight_statuses():
     for callsign, acft_data in flights_data['aircrafts'].items():
+        # Нормализуем callsign для поиска
+        normalized_callsign = callsign.replace("-", "").replace(" ", "").upper()
 
+        # Обновляем departures
         for airport in flights_data['departures']:
             for flight in flights_data['departures'][airport]:
-                if flight.get('realcallsign', 'callsign') == callsign:
+                if flight['callsign'] == normalized_callsign:
                     flight['live'] = True
                     flight['state'] = get_flight_state(callsign, acft_data)
-                    # print(f"Updated flight status for {callsign}: live={flight['live']}, state={flight['state']}")
 
+        # Обновляем arrivals
         for airport in flights_data['arrivals']:
             for flight in flights_data['arrivals'][airport]:
-                if flight.get('realcallsign', 'callsign') == callsign:
+                if flight['callsign'] == normalized_callsign:
                     flight['live'] = True
                     flight['state'] = get_flight_state(callsign, acft_data)
-                    # print(f"Updated flight status for {callsign}: live={flight['live']}, state={flight['state']}")
-
+                    
 
 async def websocket_listener():
     uri = "wss://24data.ptfs.app/wss"
