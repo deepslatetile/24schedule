@@ -44,36 +44,11 @@ flights_data = {
 FLIGHT_PLANS_FILE = 'flight_plans.json'
 
 
-import requests
+#import requests
 import json
 
 def wh_log(message_text):
-    # Замените эту ссылку на ваш вебхук
-    WEBHOOK_URL = "https://discord.com/api/webhooks/1398545462310735922/rrjxryjo59vDVtYIScwOomSjvFPPp2Y1lDhupxO2c5JR4u4wRv_ct03oxunXqS2IOMEI"
-    
-    try:
-        # Подготавливаем данные для отправки
-        payload = {
-            "content": message_text,
-        }
-        
-        # Отправляем POST-запрос
-        response = requests.post(
-            WEBHOOK_URL,
-            data=json.dumps(payload),
-            headers={"Content-Type": "application/json"}
-        )
-        
-        # Проверяем успешность запроса
-        if response.status_code in [200, 204]:
-            return True
-        else:
-            print(f"Webhook error: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"Error sending to webhook: {str(e)}")
-        return False
+    print(message_text)
         
 
 def load_flight_plans():
