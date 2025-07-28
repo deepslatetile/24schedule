@@ -21,8 +21,8 @@ AIRPORTS = {
     "IGRV": {"name": "Grindavik Airport", "city": "Grindavik"},
     "IPAP": {"name": "Paphos Intl.", "city": "Cyprus"},
     "IMLR": {"name": "Mellor Intl.", "city": "Rockford"},
-    "ISAU": {"name": "Sauthamptona", "city": "Sauthamptona"},
-    "IBTH": {"name": "Saint Barthelemy", "city": "Saint Barthelemy"},
+    "ISAU": {"name": "Sauthemptona", "city": "Sauthemptona"},
+    "IBTH": {"name": "Saint Barthélemy", "city": "Saint Barthélemy"},
     "ILKL": {"name": "Lukla Airport", "city": "Perth"},
     "IDCS": {"name": "Saba Airport", "city": "Orenji"},
     "IJAF": {"name": "Al Najaf", "city": "Izolirani"},
@@ -43,9 +43,9 @@ airportNameToIcao = {
             "Perth": "IPPH",
             "Grindavik": "IGRV",
             "Paphos": "IPAP",
-            "Sauthamptona": "ISAU",
+            "Sauthemptona": "ISAU",
             "Mellor": "IMLR",
-            "Saint Barthelemy": "IBTH",
+            "Saint Barthélemy": "IBTH",
             "Lukla": "ILKL",
             "Saba": "IDCS",
             "Al Najaf": "IJAF",
@@ -930,12 +930,14 @@ HTML_TEMPLATE = """
 
     <div class="container">
         <div class="filters">
-    <button class="filter-btn" id="toggleLive">Show LIVE only</button>
-    <button class="filter-btn" id="expandAll">Expand All</button>
-    <button class="filter-btn" id="collapseAll">Collapse All</button>
-    <button class="filter-btn active" id="toggleTaxiTime">Hide Taxi Times</button>
-    <button class="filter-btn active" id="toggleObtTime">Hide OBT Times</button>
-</div>
+            <button class="filter-btn" id="toggleLive">Show LIVE only</button>
+            <button class="filter-btn" id="expandAll">Expand All</button>
+            <button class="filter-btn" id="collapseAll">Collapse All</button>
+            <button class="filter-btn active" id="toggleTaxiTime">Hide Taxi Times</button>
+            <button class="filter-btn active" id="toggleObtTime">Hide OBT Times</button>
+            
+            <!-- <button class="filter-btn" id="autoRefreshButton">Start Auto Refresh</button> -->
+        </div>
     </div>
 
     <div class="container" id="airportsContainer">
@@ -1171,9 +1173,9 @@ HTML_TEMPLATE = """
         "Perth": "IPPH",
         "Grindavik": "IGRV",
         "Paphos": "IPAP",
-        "Sauthamptona": "ISAU",
+        "Sauthemptona": "ISAU",
         "Mellor": "IMLR",
-        "Saint Barthelemy": "IBTH",
+        "Saint Barthélemy": "IBTH",
         "Lukla": "ILKL",
         "Saba": "IDCS",
         "Al Najaf": "IJAF",
@@ -1580,6 +1582,43 @@ HTML_TEMPLATE = """
         // Update every 30 seconds
         setInterval(loadAtcData, 30000);
     });
+    
+    let autoRefreshInterval = null;
+        let refreshInterval = 10; // Интервал обновления в секундах
+
+        // Восстановление состояния при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            const isAutoRefreshEnabled = localStorage.getItem('isAutoRefreshEnabled') === 'true';
+            if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+                document.getElementById('autoRefreshButton').classList.add('active');
+            }
+        });
+
+        document.getElementById('autoRefreshButton').addEventListener('click', function() {
+            if (autoRefreshInterval === null) {
+                // Запускаем автообновление
+                startAutoRefresh();
+                this.classList.add('active');
+            } else {
+                // Остановка автообновления
+                stopAutoRefresh();
+                this.classList.remove('active');
+            }
+        });
+
+        function startAutoRefresh() {
+            autoRefreshInterval = setInterval(function() {
+                location.reload();
+            }, refreshInterval * 1000);
+            localStorage.setItem('isAutoRefreshEnabled', 'true');
+        }
+
+        function stopAutoRefresh() {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+            localStorage.setItem('isAutoRefreshEnabled', 'false');
+        }
 </script>
 
 
@@ -1596,7 +1635,7 @@ def get_flight_details(callsign):
     # Get flight plan data
     flight_plans = load_flight_plans()
     fpl = flight_plans.get(normalize_callsign(callsign), {})
-    aircraft_type = flight_data.get('aircraftType', fpl.get('aircraft', 'Unknown'))
+    aircraft_type = flight_data.get('aircraft', fpl.get('aircraft', 'Unknown'))
 
     # Format position
     position = "---"
