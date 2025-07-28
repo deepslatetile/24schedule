@@ -1635,7 +1635,7 @@ def get_aircraft_image(aircraft_type, callsign_prefix):
 
     short_type = AIRCRAFT_SHORT_NAMES.get(aircraft_type, aircraft_type.split()[-1])
     base_url = "https://raw.githubusercontent.com/deepslatetile/24schedule/main/pictures"
-    
+
     print(aircraft_type, short_type, callsign_prefix)
 
     matching_images = []
