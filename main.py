@@ -7,253 +7,552 @@ import os
 from datetime import datetime, timedelta
 import threading
 import requests
-import json
 import random
-
 
 app = Flask(__name__)
 
-# Airport configuration
+
 AIRPORTS = {
-	"IRFD": {"name": "Greater Rockford", "city": "Rockford"},
-	"ILAR": {"name": "Larnaca Intl.", "city": "Cyprus"},
-	"IZOL": {"name": "Izolirani Intl.", "city": "Izolirani"},
-	"ITKO": {"name": "Tokyo Intl.", "city": "Orenji"},
-	"IPPH": {"name": "Perth Intl.", "city": "Perth"},
-	"IGRV": {"name": "Grindavik Airport", "city": "Grindavik"},
-	"IPAP": {"name": "Paphos Intl.", "city": "Cyprus"},
-	"IMLR": {"name": "Mellor Intl.", "city": "Rockford"},
-	"ISAU": {"name": "Sauthamptona", "city": "Sauthamptona"},
-	"IBTH": {"name": "Saint Barthelemy", "city": "Saint Barthelemy"},
-	"ILKL": {"name": "Lukla Airport", "city": "Perth"},
-	"IDCS": {"name": "Saba Airport", "city": "Orenji"},
-	"IJAF": {"name": "Al Najaf", "city": "Izolirani"},
-	"ITRC": {"name": "Training Centre", "city": "Rockford"},
-	"IBAR": {"name": "Barra Airport", "city": "Cyprus"},
-	"IBLT": {"name": "Boltic Airfield", "city": "Rockford"},
-	"IIAB": {"name": "McConnell AFB", "city": "Cyprus"},
-	"ISCM": {"name": "RAF Scampton", "city": "Izolirani"},
-	"IHEN": {"name": "Henstridge Airfield", "city": "Cyprus"},
-	"IGAR": {"name": "Air Base Garry", "city": "Rockford"}
-}
-airportNameToIcao = {
-	"Rockford": "IRFD",
-	"Larnaca": "ILAR",
-	"Izolirani": "IZOL",
-	"Tokyo": "ITKO",
-	"Perth": "IPPH",
-	"Grindavik": "IGRV",
-	"Paphos": "IPAP",
-	"Sauthamptona": "ISAU",
-	"Mellor": "IMLR",
-	"Saint Barthelemy": "IBTH",
-	"Lukla": "ILKL",
-	"Saba": "IDCS",
-	"Al Najaf": "IJAF",
-	"Training Centre": "ITRC",
-	"Barra": "IBAR",
-	"Boltic": "IBLT",
-	"McConnell": "IIAB",
-	"Scampton": "ISCM",
-	"Henstridge": "IHEN",
-	"Garry": "IGAR"
+    "IRFD": {"name": "Greater Rockford", "city": "Rockford"},
+    "ILAR": {"name": "Larnaca Intl.", "city": "Cyprus"},
+    "IZOL": {"name": "Izolirani Intl.", "city": "Izolirani"},
+    "ITKO": {"name": "Tokyo Intl.", "city": "Orenji"},
+    "IPPH": {"name": "Perth Intl.", "city": "Perth"},
+    "IGRV": {"name": "Grindavik Airport", "city": "Grindavik"},
+    "IPAP": {"name": "Paphos Intl.", "city": "Cyprus"},
+    "IMLR": {"name": "Mellor Intl.", "city": "Rockford"},
+    "ISAU": {"name": "Sauthamptona", "city": "Sauthamptona"},
+    "IBTH": {"name": "Saint Barthelemy", "city": "Saint Barthelemy"},
+    "ILKL": {"name": "Lukla Airport", "city": "Perth"},
+    "IDCS": {"name": "Saba Airport", "city": "Orenji"},
+    "IJAF": {"name": "Al Najaf", "city": "Izolirani"},
+    "ITRC": {"name": "Training Centre", "city": "Rockford"},
+    "IBAR": {"name": "Barra Airport", "city": "Cyprus"},
+    "IBLT": {"name": "Boltic Airfield", "city": "Rockford"},
+    "IIAB": {"name": "McConnell AFB", "city": "Cyprus"},
+    "ISCM": {"name": "RAF Scampton", "city": "Izolirani"},
+    "IHEN": {"name": "Henstridge Airfield", "city": "Cyprus"},
+    "IGAR": {"name": "Air Base Garry", "city": "Rockford"}
 }
 
+airportNameToIcao = {
+            "Rockford": "IRFD",
+            "Larnaca": "ILAR",
+            "Izolirani": "IZOL",
+            "Tokyo": "ITKO",
+            "Perth": "IPPH",
+            "Grindavik": "IGRV",
+            "Paphos": "IPAP",
+            "Sauthamptona": "ISAU",
+            "Mellor": "IMLR",
+            "Saint Barthelemy": "IBTH",
+            "Lukla": "ILKL",
+            "Saba": "IDCS",
+            "Al Najaf": "IJAF",
+            "Training Centre": "ITRC",
+            "Barra": "IBAR",
+            "Boltic": "IBLT",
+            "McConnell": "IIAB",
+            "Scampton": "ISCM",
+            "Henstridge": "IHEN",
+            "Garry": "IGAR"
+        }
+
 AIRCRAFT_SHORT_NAMES = {
-	"Boeing 787": "b787"
+    "A10 Warthog":                  "A10",
+    "An 225":                       "A225",
+    "Airbus A320":                  "A320",
+    "A330 MRTT":                    "A332",
+    "Airbus A330":                  "A333",
+    "Airbus A340":                  "A343",
+    "Airbus A350":                  "A359",
+    "Airbus A380":                  "A388",
+    "Airbus Beluga":                "A3ST",
+    "An22":                         "AN22",
+    "ATR72":                        "AT76",
+    "ATR72F":                       "AT76",
+    "B1 Lancer":                    "B1",
+    "B2 Spirit Bomber":             "B2",
+    "B29 SuperFortress":            "B29",
+    "Bell 412":                     "B412",
+    "Bell 412 Rescue":              "B412",
+    "707AF1":                       "B703",
+    "Boeing 707":                   "B703",
+    "KC-707":                       "B703",
+    "Boeing 727":                   "B722",
+    "Boeing 727 Cargo":             "B722",
+    "C40":                          "B737",
+    "Boeing 737":                   "B738",
+    "Boeing 737 Cargo":             "B738",
+    "747AF1":                       "B742",
+    "Boeing 747":                   "B744",
+    "Boeing 747 Cargo":             "B744",
+    "Boeing 757":                   "B752",
+    "Boeing 757 Cargo":             "B752",
+    "C-32":                         "B752",
+    "KC767":                        "B762",
+    "Boeing 767":                   "B763",
+    "Boeing 767 Cargo":             "B763",
+    "Boeing 777 Cargo":             "B77L",
+    "Boeing 777":                   "B77W",
+    "Boeing 787":                   "B789",
+    "Balloon":                      "BALL",
+    "Airbus A220":                  "BCS1",
+    "KingAir 260":                  "BE20",
+    "DreamLifter":                  "BLCF",
+    "C130 Hercules":                "C130",
+    "EC-18B":                       "C135",
+    "C17":                          "C17",
+    "Cessna 172":                   "C172",
+    "Cessna 172 Amphibian":         "C172",
+    "Cessna 172 Student":           "C172",
+    "Cessna 182":                   "C182",
+    "Cessna 182 Amphibian":         "C182",
+    "Cessna Caravan":               "C208",
+    "Cessna Caravan Amphibian":     "C208",
+    "Cessna Caravan Cargo":         "C208",
+    "KC130J":                       "C30J",
+    "Cessna 402":                   "C402",
+    "Concorde":                     "CONC",
+    "F4U Corsair":                  "CORS",
+    "Bombardier CRJ700":            "CRJ7",
+    "Bombardier Q400":              "DH8D",
+    "DHC-6 Twin Otter":             "DHC6",
+    "DHC-6 Twin Otter Amphibian":   "DHC6",
+    "Fokker Dr1":                   "DR1",
+    "E190":                         "E190",
+    "Extra 300s":                   "E300",
+    "E-3 Sentry":                   "E3TF",
+    "H135":                         "EC35",
+    "Eurofighter Typhoon":          "EUFI",
+    "F14":                          "F14",
+    "F15":                          "F15",
+    "F16":                          "F16",
+    "F/A-18 Super Hornet":          "F18S",
+    "F22":                          "F22",
+    "F35":                          "F35",
+    "F4 Phantom":                   "F4",
+    "BaggageTruck":                 "GRND",
+    "BaggageTruckSmall":            "GRND",
+    "Bus":                          "GRND",
+    "CateringTruck":                "GRND",
+    "FireTruck":                    "GRND",
+    "FollowMeTruck":                "GRND",
+    "FuelTruck":                    "GRND",
+    "FuelTruckSmall":               "GRND",
+    "PushBackBig":                  "GRND",
+    "PushBackGreen":                "GRND",
+    "PushBackSmall":                "GRND",
+    "StairTruck":                   "GRND",
+    "StairTruck737":                "GRND",
+    "Chinook":                      "H47",
+    "UH-60":                        "H60",
+    "UH-60 Coast Guard":            "H60",
+    "Harrier":                      "HAR",
+    "Hawk T1":                      "HAWK",
+    "Hurricane":                    "HURI",
+    "Piper Cub":                    "J3",
+    "Piper Cub Amphibian":          "J3",
+    "KC-1":                         "L101",
+    "Lockheed Tristar":             "L101",
+    "Bombardier Learjet 45":        "LJ45",
+    "English Electric Lightning":   "LTNG",
+    "Douglas MD11":                 "MD11",
+    "Douglas MD11 Cargo":           "MD11",
+    "Douglas MD90":                 "MD90",
+    "Mig-15":                       "MG15",
+    "Piper PA28181":                "P28A",
+    "P38 Lightning":                "P38",
+    "P51 Mustang":                  "P51",
+    "P8":                           "P8",
+    "Paratrike":                    "PARA",
+    "Sikorsky S92":                 "S92",
+    "Sikorsky S92 Coast Guard":     "S92",
+    "Gripen":                       "SB39",
+    "Cirrus Vision":                "SF50",
+    "Blimp":                        "SHIP",
+    "CaravanBlimp":                 "SHIP",
+    "Sled":                         "SLEI",
+    "SR71 BlackBird":               "SR71",
+    "SU27":                         "SU27",
+    "SU57":                         "SU57",
+    "Derek Plane":                  "ULAC",
+    "Avro Vulcan":                  "VULC",
+    "Wright Brothers Plane":        "WF",
+    "A6M Zero":                     "ZERO",
+    "Caproni Stipa":                "ZZZZ",
+    "Might Walrus":                 "ZZZZ",
+    "Rescue Boat":                  "ZZZZ",
+    "UFO":                          "ZZZZ"
 }
 
 AIRCRAFT_IMAGES = [
-	"b787_tomjet_1__deepslate",
-	"b787_tomjet_2_helloworld"
+    'A320_BizzAir_1__deepslate',
+    'A320_Speedbird_1__deepslate',
+    'A320_Speedbird_2__deepslate',
+    'A320_Sprit Wings_1__deepslate',
+    'A320_Turkish_1__deepslate',
+    'A320_Turkish_2__deepslate',
+    'A388_Speedbird_1__deepslate',
+    'A388_Speedbird_2__deepslate',
+    'A388_Speedbird_3__deepslate',
+    'B703_Singadoor_1__deepslate',
+    'B722_Reunited_1__deepslate',
+    'B722_Reunited_2__deepslate',
+    'B722_Reunited_3__deepslate',
+    'B722_Reunited_4__deepslate',
+    'B738_Byanair_1__deepslate',
+    'B738_Byanair_2__deepslate',
+    'B738_Byanair_3__deepslate',
+    'B738_Byanair_4__deepslate',
+    'B738_Byanair_5__deepslate',
+    'B738_Byanair_6__deepslate',
+    'B738_Byanair_7__deepslate',
+    'B738_OldZealand_1__deepslate',
+    'B738_Scandialien_1__deepslate',
+    'B738_VHL_1__deepslate',
+    'B738_VHL_2__deepslate',
+    'B744_any_1__deepslate',
+    'B744_KoreenAir_1__deepslate',
+    'B744_Oatari_1__deepslate',
+    'B744_Oatari_2__deepslate',
+    'B744_Oatari_3__deepslate',
+    'B744_Oatari_4__deepslate',
+    'B744_Oatari_5__deepslate',
+    'B752_Belta_1__deepslate',
+    'B752_Doncor_1__deepslate',
+    'B752_Doncor_2__deepslate',
+    'B752_Doncor_3__deepslate',
+    'B752_Doncor_4__deepslate',
+    'B752_Doncor_5__deepslate',
+    'B752_Doncor_6__deepslate',
+    'B752_Doncor_7__deepslate',
+    'B752_Doncor_8__deepslate',
+    'B752_Doncor_9__deepslate',
+    'B752_Hard_10__deepslate',
+    'B752_Hard_11__deepslate',
+    'B752_Hard_12__deepslate',
+    'B752_Hard_13__deepslate',
+    'B752_Hard_1__deepslate',
+    'B752_Hard_2__deepslate',
+    'B752_Hard_3__deepslate',
+    'B752_Hard_4__deepslate',
+    'B752_Hard_5__deepslate',
+    'B752_Hard_6__deepslate',
+    'B752_Hard_7__deepslate',
+    'B752_Hard_8__deepslate',
+    'B752_Hard_9__deepslate',
+    'B77W_Emarates_1__deepslate',
+    'B77W_Emarates_2__deepslate',
+    'B77W_OldZealand_1__deepslate',
+    'B77W_OldZealand_2__deepslate',
+    'B77W_OldZealand_3__deepslate',
+    'B77W_OldZealand_4__deepslate',
+    'B789_Oatari_1__deepslate',
+    'B789_Oatari_2__deepslate',
+    'B789_Oatari_3__deepslate',
+    'B789_Oatari_4__deepslate',
+    'B789_Oatari_5__deepslate',
+    'B789_Oatari_6__deepslate',
+    'B789_TomJet_1__deepslate',
+    'B789_TomJet_2__deepslate',
+    'B789_TomJet_3__deepslate',
+    'B789_TomJet_4__deepslate',
+    'B789_TomJet_5__deepslate',
+    'B789_TomJet_6__deepslate',
+    'E190_Lifthansa_10__deepslate',
+    'E190_Lifthansa_11__deepslate',
+    'E190_Lifthansa_12__deepslate',
+    'E190_Lifthansa_1__deepslate',
+    'E190_Lifthansa_2__deepslate',
+    'E190_Lifthansa_3__deepslate',
+    'E190_Lifthansa_4__deepslate',
+    'E190_Lifthansa_5__deepslate',
+    'E190_Lifthansa_6__deepslate',
+    'E190_Lifthansa_7__deepslate',
+    'E190_Lifthansa_8__deepslate',
+    'E190_Lifthansa_9__deepslate',
+    'MD90_Belta_1__deepslate',
+    'MD90_Belta_2__deepslate',
+    'MD90_Belta_3__deepslate',
+    'SF50_any_1__deepslate',
+    'SF50_any_2__deepslate',
+    'SF50_any_3__deepslate',
 ]
+
 
 # Global data storage
 flights_data = {
-	'departures': defaultdict(list),
-	'arrivals': defaultdict(list),
-	'aircrafts': {},
-	'flight_states': {}
+    'departures': defaultdict(list),
+    'arrivals': defaultdict(list),
+    'aircrafts': {},
+    'flight_states': {}
 }
 
 FLIGHT_PLANS_FILE = 'flight_plans.json'
 
 
 def wh_log(message_text):
-	print(message_text)
-
+    print(message_text)
+        
 
 def normalize_callsign(callsign):
-	if not callsign:
-		return ""
-
-	if not isinstance(callsign, str):
-		return str(callsign)
-
-	# Удаляем все пробелы и дефисы
-	clean_callsign = callsign.replace(" ", "").replace("-", "").upper()
-
-	# Находим индекс первой цифры
-	first_digit = None
-	for i, char in enumerate(clean_callsign):
-		if char.isdigit():
-			first_digit = i
-			break
-
-	# Если цифры найдены и перед ними нет пробела, добавляем пробел
-	if first_digit is not None and first_digit > 0 and clean_callsign[first_digit - 1] != " ":
-		normalized = f"{clean_callsign[:first_digit]} {clean_callsign[first_digit:]}"
-	else:
-		normalized = clean_callsign
-
-	return normalized
-
+    if not callsign:
+        return ""
+    
+    if not isinstance(callsign, str):
+        return str(callsign)
+    
+    # Удаляем все пробелы и дефисы
+    clean_callsign = callsign.replace(" ", "").replace("-", "").upper()
+    
+    # Находим индекс первой цифры
+    first_digit = None
+    for i, char in enumerate(clean_callsign):
+        if char.isdigit():
+            first_digit = i
+            break
+    
+    # Если цифры найдены и перед ними нет пробела, добавляем пробел
+    if first_digit is not None and first_digit > 0 and clean_callsign[first_digit-1] != " ":
+        normalized = f"{clean_callsign[:first_digit]} {clean_callsign[first_digit:]}"
+    else:
+        normalized = clean_callsign
+    
+    return normalized
+    
 
 def load_flight_plans():
-	if os.path.exists(FLIGHT_PLANS_FILE):
-		with open(FLIGHT_PLANS_FILE, 'r') as f:
-			return json.load(f)
-	return {}
+    if os.path.exists(FLIGHT_PLANS_FILE):
+        with open(FLIGHT_PLANS_FILE, 'r') as f:
+            return json.load(f)
+    return {}
 
 
 def save_flight_plans(plans):
-	with open(FLIGHT_PLANS_FILE, 'w') as f:
-		json.dump(plans, f)
+    with open(FLIGHT_PLANS_FILE, 'w') as f:
+        json.dump(plans, f)
 
 
 def get_recent_flight_plans():
-	plans = load_flight_plans()
-	now = datetime.now()
-	recent_plans = {}
-
-	for callsign, plan in plans.items():
-		try:
-			plan_time = datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S')
-			if (now - plan_time) <= timedelta(minutes=30):
-				recent_plans[callsign] = plan
-		except (KeyError, ValueError):
-			continue
-
-	return recent_plans
-
+    plans = load_flight_plans()
+    now = datetime.now()
+    recent_plans = {}
+    
+    for callsign, plan in plans.items():
+        try:
+            plan_time = datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S')
+            if (now - plan_time) <= timedelta(minutes=30):
+                recent_plans[callsign] = plan
+        except (KeyError, ValueError):
+            continue
+    
+    return recent_plans
+    
 
 def cleanup_old_plans():
-	now = datetime.now()
-	plans = load_flight_plans()
-	updated_plans = {}
+    now = datetime.now()
+    plans = load_flight_plans()
+    updated_plans = {}
 
-	for callsign, plan in plans.items():
-		if callsign in flights_data['aircrafts']:
-			updated_plans[callsign] = plan
-			continue
+    for callsign, plan in plans.items():
+        # Очищаем старые состояния
+        if callsign in flights_data['aircrafts'] and 'state_history' in flights_data['aircrafts'][callsign]:
+                  flights_data['aircrafts'][callsign]['state_history'] = {
+                ts: state for ts, state in flights_data['aircrafts'][callsign]['state_history'].items()
+                if (now - datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')) < timedelta(hours=1)
+            }
 
-		plan_time = datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S')
-		if (now - plan_time) < timedelta(minutes=30):
-			updated_plans[callsign] = plan
+        plan_time = datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S')
+        if (now - plan_time) < timedelta(minutes=30):
+            updated_plans[callsign] = plan
 
-	if len(updated_plans) != len(plans):
-		save_flight_plans(updated_plans)
+    if len(updated_plans) != len(plans):
+        save_flight_plans(updated_plans)
 
-	return updated_plans
+    return updated_plans
+
+
+def calculate_taxi_stats():
+    stats = {
+        'taxi_times': defaultdict(list),
+        'obt_times': defaultdict(list)
+    }
+    flight_plans = load_flight_plans()
+    
+    for realcallsign, acft_data in flights_data['aircrafts'].items():
+        if realcallsign not in flight_plans:
+            continue
+            
+        fpl_time = datetime.strptime(flight_plans[realcallsign]['timestamp'], '%Y-%m-%d %H:%M:%S')
+        departing = flight_plans[realcallsign]['departing']
+        
+        # Находим время перехода в состояние 1 (taxiing)
+        taxi_start_time = None
+        # Находим время перехода в состояние 2 (climbing)
+        taxi_end_time = None
+        
+        for timestamp, state in acft_data.get('state_history', {}).items():
+            state_time = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+            if state == 1 and taxi_start_time is None:
+                taxi_start_time = state_time
+            elif state == 2 and taxi_end_time is None:
+                taxi_end_time = state_time
+        
+        # Рассчитываем OBT (время от подачи FPL до начала руления)
+        if taxi_start_time:
+            obt_time = (taxi_start_time - fpl_time).total_seconds() / 60  # в минутах
+            stats['obt_times'][departing].append(obt_time)
+        
+        # Рассчитываем время руления (время между состояниями 1 и 2)
+        if taxi_start_time and taxi_end_time:
+            taxi_time = (taxi_end_time - taxi_start_time).total_seconds() / 60  # в минутах
+            stats['taxi_times'][departing].append(taxi_time)
+    
+    # Рассчитываем средние значения для каждого аэропорта
+    avg_stats = {}
+    for airport in set(stats['taxi_times'].keys()).union(set(stats['obt_times'].keys())):
+        avg_taxi = None
+        if airport in stats['taxi_times'] and stats['taxi_times'][airport]:
+            valid_times = [t for t in stats['taxi_times'][airport] if t > 0]  # Фильтруем некорректные значения
+            if valid_times:
+                avg_taxi = sum(valid_times) / len(valid_times)
+        
+        avg_obt = None
+        if airport in stats['obt_times'] and stats['obt_times'][airport]:
+            valid_times = [t for t in stats['obt_times'][airport] if t > 0]  # Фильтруем некорректные значения
+            if valid_times:
+                avg_obt = sum(valid_times) / len(valid_times)
+        
+        avg_stats[airport] = {
+            'avg_taxi_time': avg_taxi,
+            'avg_obt_time': avg_obt
+        }
+    
+    return avg_stats
 
 
 def refresh_acft(data):
-	for realcallsign, acft_data in data.items():
-		normalized_realcallsign = normalize_callsign(realcallsign)
-		display_callsign = normalize_callsign(acft_data.get('callsign', realcallsign))
-		flights_data['aircrafts'][normalized_realcallsign] = {
-			**flights_data['aircrafts'].get(normalized_realcallsign, {}),
-			**acft_data,
-			'live': True,
-			'callsign': display_callsign,
-			'realcallsign': normalized_realcallsign
-		}
-		if 'speed' in acft_data:
-			flights_data['aircrafts'][normalized_realcallsign]['speed'] = acft_data['speed']
-		if 'groundSpeed' in acft_data:
-			flights_data['aircrafts'][normalized_realcallsign]['groundSpeed'] = int(str(acft_data['groundSpeed']).split('.')[0])
+    for realcallsign, acft_data in data.items():
+        # Нормализуем realcallsign для хранения
+        normalized_realcallsign = normalize_callsign(realcallsign)
+        
+        # Если есть callsign в данных, используем его, иначе realcallsign
+        display_callsign = normalize_callsign(acft_data.get('callsign', realcallsign))
+        
+        # Сохраняем все данные о самолете
+        flights_data['aircrafts'][normalized_realcallsign] = {
+            **flights_data['aircrafts'].get(normalized_realcallsign, {}),
+            **acft_data,
+            'live': True,
+            'callsign': display_callsign,
+            'realcallsign': normalized_realcallsign
+        }
+        
+        # Убедимся, что speed сохраняется правильно
+        if 'speed' in acft_data:
+            flights_data['aircrafts'][normalized_realcallsign]['speed'] = acft_data['speed']
+        if 'groundSpeed' in acft_data:
+            flights_data['aircrafts'][normalized_realcallsign]['groundSpeed'] = int(str(acft_data['groundSpeed']).split('.')[0])
 
 
 def new_fpl(data):
-	wh_log(f'fpl {data["callsign"]}')
-	required_keys = ["callsign", "departing", "arriving", "aircraft"]
-	data["callsign"] = normalize_callsign(data["callsign"])
-	if "realcallsign" in data:
-		data["realcallsign"] = normalize_callsign(data["realcallsign"])
-	else:
-		data["realcallsign"] = data["callsign"]
-	if any(key not in data for key in required_keys):
-		print("Error: Missing required keys")
-		return
+    wh_log(f'fpl {data["callsign"]}')
+    required_keys = ["callsign", "departing", "arriving", "aircraft"]
 
-	callsign = data["callsign"]
-	realcallsign = data["realcallsign"]
-	print(f"fpl {callsign} (real: {realcallsign})")
-	data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Нормализуем callsign и realcallsign (если есть)
+    data["callsign"] = normalize_callsign(data["callsign"])
+    if "realcallsign" in data:
+        data["realcallsign"] = normalize_callsign(data["realcallsign"])
+    else:
+        data["realcallsign"] = data["callsign"]
+    
+    # Проверка необходимых ключей
+    if any(key not in data for key in required_keys):
+        print("Error: Missing required keys")
+        return
 
-	plans = load_flight_plans()
-	plans[realcallsign] = data
-	save_flight_plans(plans)
+    callsign = data["callsign"]
+    realcallsign = data["realcallsign"]
+    print(f"fpl {callsign} (real: {realcallsign})")
+    data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-	departing = data["departing"]
-	arriving = data["arriving"]
+    plans = load_flight_plans()
+    plans[realcallsign] = data  # Сохраняем по realcallsign
+    save_flight_plans(plans)
 
-	# Продолжаем создание рейсов
-	flight_info_departure = {
-		"callsign": callsign,
-		"realcallsign": realcallsign,
-		"aircraft": data["aircraft"],
-		"arriving": arriving,
-		"live": False,
-		"state": 0
-	}
-	flights_data["departures"][departing].append(flight_info_departure)
+    departing = data["departing"]
+    arriving = data["arriving"]
 
-	flight_info_arrival = {
-		"callsign": callsign,
-		"realcallsign": realcallsign,
-		"aircraft": data["aircraft"],
-		"departing": departing,
-		"live": False,
-		"state": 0
-	}
-	flights_data["arrivals"][arriving].append(flight_info_arrival)
+    # Продолжаем создание рейсов
+    flight_info_departure = {
+        "callsign": callsign,  # Отображаемый позывной
+        "realcallsign": realcallsign,  # Для сопоставления с ACFT_DATA
+        "aircraft": data["aircraft"],
+        "arriving": arriving,
+        "live": False,
+        "state": 0
+    }
+    flights_data["departures"][departing].append(flight_info_departure)
+
+    flight_info_arrival = {
+        "callsign": callsign,  # Отображаемый позывной
+        "realcallsign": realcallsign,  # Для сопоставления с ACFT_DATA
+        "aircraft": data["aircraft"],
+        "departing": departing,
+        "live": False,
+        "state": 0
+    }
+    flights_data["arrivals"][arriving].append(flight_info_arrival)
 
 
 def get_sorted_airports():
-	try:
-		response = requests.get('https://24data.ptfs.app/controllers', timeout=3)
-		controllers = response.json() if response.ok else []
-	except:
-		controllers = []
-	airports_with_atc = set()
-	for controller in controllers:
-		airport_name = controller['airport']
-		if airport_name in airportNameToIcao and controller["holder"] is not None:
-			print(controller["airport"], controller["position"], controller["holder"])
-			airports_with_atc.add(airportNameToIcao[airport_name])
+    # Загружаем данные о диспетчерах
+    try:
+        response = requests.get('https://24data.ptfs.app/controllers', timeout=3)
+        controllers = response.json() if response.ok else []
+    except:
+        controllers = []
+    
+    # Создаем множество аэропортов с активными диспетчерами
+    airports_with_atc = set()
+    for controller in controllers:
+        airport_name = controller['airport']
+        if airport_name in airportNameToIcao and controller["holder"] != None:
+            print(controller["airport"], controller["position"], controller["holder"])
+            airports_with_atc.add(airportNameToIcao[airport_name])
+    
+    stats = calculate_taxi_stats()
+    
+    airport_counts = []
+    for icao in AIRPORTS:
+        dep_count = len(flights_data['departures'].get(icao, []))
+        arr_count = len(flights_data['arrivals'].get(icao, []))
+        total_count = dep_count + arr_count
+        
+        # Получаем статистику для аэропорта
+        airport_stats = stats.get(icao, {})
+        taxi_time = airport_stats.get('avg_taxi_time')
+        obt_time = airport_stats.get('avg_obt_time')
+        
+        # Показываем аэропорт, если есть рейсы ИЛИ активные диспетчеры
+        if total_count > 0 or icao in airports_with_atc:
+            airport_counts.append((icao, total_count, dep_count, arr_count, taxi_time, obt_time))
 
-	airport_counts = []
-	for icao in AIRPORTS:
-		dep_count = len(flights_data['departures'].get(icao, []))
-		arr_count = len(flights_data['arrivals'].get(icao, []))
-		total_count = dep_count + arr_count
-		if total_count > 0 or icao in airports_with_atc:
-			airport_counts.append((icao, total_count, dep_count, arr_count))
-
-	return sorted(airport_counts, key=lambda x: x[1], reverse=True)
-
+    return sorted(airport_counts, key=lambda x: x[1], reverse=True)
+    
 
 @app.route('/api/controllers')
 def get_controllers():
-	try:
-		response = requests.get('https://24data.ptfs.app/controllers', timeout=5)
-		response.raise_for_status()
-		return json.dumps(response.json())
-	except Exception as e:
-		print(f"Error fetching ATC data: {e}")
-		return json.dumps([])
-
+    try:
+        response = requests.get('https://24data.ptfs.app/controllers', timeout=5)
+        response.raise_for_status()
+        return json.dumps(response.json())
+    except Exception as e:
+        print(f"Error fetching ATC data: {e}")
+        return json.dumps([])
+        
+        
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -441,20 +740,20 @@ HTML_TEMPLATE = """
             font-size: 18px;
         }
         .flight-state-icon {
-            position: absolute;
-            right: 16px;
-            top: 64px;
-            transform: none;
-        }
-        
-        .flight-state-icon img {
-            width: 32px;
-            height: 32px;
-            vertical-align: middle;
-            cursor: help;
-            position: sticky;
-            top: 16px;
-        }
+    position: absolute;
+    right: 16px;
+    top: 64px; /* Фиксированная позиция сверху */
+    transform: none; /* Убираем transform */
+}
+
+.flight-state-icon img {
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+    cursor: help;
+    position: sticky; /* Делаем иконку "липкой" */
+    top: 16px; /* Фиксируем позицию сверху */
+}
         .flight-counts {
             margin-left: 10px;
             font-size: 14px;
@@ -601,6 +900,27 @@ HTML_TEMPLATE = """
             text-align: center;
             padding: 8px;
         }
+        .taxi-time {
+            font-size: 0.8em;
+            margin-top: 2px;
+            font-weight: bold;
+        }
+        .obt-time {
+            font-size: 0.8em;
+            margin-top: 2px;
+            font-weight: bold;
+        }
+        .hidden {
+            display: none;
+        }
+        .filter-btn.active {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.taxi-time, .obt-time {
+    transition: opacity 0.2s;
+}
     </style>
 </head>
 <body>
@@ -610,34 +930,62 @@ HTML_TEMPLATE = """
 
     <div class="container">
         <div class="filters">
-            <button class="filter-btn" id="toggleLive">Show LIVE only</button>
-            <button class="filter-btn" id="expandAll">Expand All</button>
-            <button class="filter-btn" id="collapseAll">Collapse All</button>
-        </div>
+    <button class="filter-btn" id="toggleLive">Show LIVE only</button>
+    <button class="filter-btn" id="expandAll">Expand All</button>
+    <button class="filter-btn" id="collapseAll">Collapse All</button>
+    <button class="filter-btn active" id="toggleTaxiTime">Hide Taxi Times</button>
+    <button class="filter-btn active" id="toggleObtTime">Hide OBT Times</button>
+</div>
     </div>
 
     <div class="container" id="airportsContainer">
         {% if airports %}
-            {% for icao, _, dep_count, arr_count in airports %}
-            <div class="airport-section" id="airport-{{ icao }}">
-                <h2 onclick="toggleAirport('{{ icao }}')">
-                    <span>
-                        {{ AIRPORTS[icao].name }} ({{ icao }})
-                        <span class="flight-counts">
-                            <span class="count-row total-count">
-                                <span class="departure-count">{{ dep_count }}↑</span>
-                                <span class="count-separator">|</span>
-                                <span class="arrival-count">{{ arr_count }}↓</span>
-                            </span>
-                            <span class="count-row live-count">
-                                <span class="departure-count">{{ departures.get(icao, [])|selectattr('live')|list|count }}↑</span>
-                                <span class="count-separator">|</span>
-                                <span class="arrival-count">{{ arrivals.get(icao, [])|selectattr('live')|list|count }}↓</span>
-                            </span>
-                        </span>
+            {% for airport in airports %}
+    {% set icao = airport[0] %}
+    {% set total_count = airport[1] %}
+    {% set dep_count = airport[2] %}
+    {% set arr_count = airport[3] %}
+    {% set taxi_time = airport[4] if airport|length > 4 else None %}
+    {% set obt_time = airport[5] if airport|length > 5 else None %}
+    
+    <div class="airport-section" id="airport-{{ icao }}">
+        <h2 onclick="toggleAirport('{{ icao }}')">
+            <span>
+                {{ AIRPORTS[icao].name }} ({{ icao }})
+                <span class="flight-counts">
+                    <span class="count-row total-count">
+                        <span class="departure-count">{{ dep_count }}↑</span>
+                        <span class="count-separator">|</span>
+                        <span class="arrival-count">{{ arr_count }}↓</span>
                     </span>
-                    <span class="toggle-icon">▼</span>
-                </h2>
+                    <span class="count-row live-count">
+                        <span class="departure-count">{{ departures.get(icao, [])|selectattr('live')|list|count }}↑</span>
+                        <span class="count-separator">|</span>
+                        <span class="arrival-count">{{ arrivals.get(icao, [])|selectattr('live')|list|count }}↓</span>
+                    </span>
+                    {% if taxi_time is not none %}
+<span class="count-row taxi-time" style="color: 
+    {% if taxi_time < 5 %}green
+    {% elif taxi_time < 10 %}orange
+    {% else %}red
+    {% endif %}">
+    Avg taxi time: {{ "%.1f"|format(taxi_time) }} min
+</span>
+{% endif %}
+{% if obt_time is not none %}
+<span class="count-row obt-time" style="color: 
+    {% if obt_time < 5 %}green
+    {% elif obt_time < 10 %}orange
+    {% else %}red
+    {% endif %}">
+    Avg Off-Block time: {{ "%.1f"|format(obt_time) }} min
+</span>
+{% endif %}
+                </span>
+            </span>
+            <span class="toggle-icon">▼</span>
+        </h2>
+               
                 
                 <div class="airport-content" id="content-{{ icao }}">
                     <!-- ATC Positions Container -->
@@ -814,6 +1162,7 @@ HTML_TEMPLATE = """
 
 
 <script>
+    // Dictionary for airport name to ICAO mapping
     const airportNameToIcao = {
         "Rockford": "IRFD",
         "Larnaca": "ILAR",
@@ -837,6 +1186,7 @@ HTML_TEMPLATE = """
         "Garry": "IGAR"
     };
 
+    // Function to toggle flight details
     function toggleFlightDetails(card) {
         const details = card.querySelector('.flight-details-expanded');
         const isExpanded = details.style.display === 'block';
@@ -853,6 +1203,7 @@ HTML_TEMPLATE = """
         }
     }
 
+    // Function to load flight details
     async function loadFlightDetails(card) {
         const realcallsign = card.dataset.realcallsign;
         const details = card.querySelector('.flight-details-expanded');
@@ -876,7 +1227,11 @@ HTML_TEMPLATE = """
             
             // Load aircraft image
             if (data.aircraft) {
-                const callsignPrefix = realcallsign.replace(/\d+/g, '').toLowerCase();
+                const callsignPrefix = realcallsign.replace(/\d+/g, '')
+                                   .toLowerCase()
+                                   .replace(/^./, function(firstLetter) {
+                                       return firstLetter.toUpperCase();
+                                   });
                 
                 try {
                     const imageResponse = await fetch(`/api/aircraft-image/${encodeURIComponent(data.aircraft)}/${callsignPrefix}`);
@@ -914,6 +1269,28 @@ HTML_TEMPLATE = """
         }
     }
 
+    // Function to toggle taxi time counters visibility
+    function toggleTaxiTime() {
+        const btn = document.getElementById('toggleTaxiTime');
+        const shouldHide = !btn.classList.toggle('active');
+        localStorage.setItem('hideTaxiTime', shouldHide);
+        
+        document.querySelectorAll('.taxi-time').forEach(element => {
+            element.style.display = shouldHide ? 'none' : 'block';
+        });
+    }
+
+    // Function to toggle OBT time counters visibility
+    function toggleObtTime() {
+        const btn = document.getElementById('toggleObtTime');
+        const shouldHide = !btn.classList.toggle('active');
+        localStorage.setItem('hideObtTime', shouldHide);
+        
+        document.querySelectorAll('.obt-time').forEach(element => {
+            element.style.display = shouldHide ? 'none' : 'block';
+        });
+    }
+
     async function loadAtcData() {
         try {
             const response = await fetch('/api/controllers');
@@ -924,6 +1301,7 @@ HTML_TEMPLATE = """
             updateAtcDisplay(controllers);
         } catch (error) {
             console.error('Error loading ATC data:', error);
+            // Update all containers with error message
             document.querySelectorAll('.atc-container').forEach(container => {
                 container.innerHTML = `
                     <div class="atc-position">
@@ -934,6 +1312,7 @@ HTML_TEMPLATE = """
         }
     }
 
+    // Function to update ATC display
     function updateAtcDisplay(controllers) {
         // Group controllers by airport
         const airportControllers = {};
@@ -948,11 +1327,14 @@ HTML_TEMPLATE = """
             airportControllers[icao].push(controller);
         });
 
+        // Update display for each airport
         Object.keys(airportControllers).forEach(icao => {
             const atcContainer = document.querySelector(`#atc-${icao}`);
             if (!atcContainer) return;
 
             atcContainer.innerHTML = '';
+            
+            // Sort positions (Tower first, Ground second)
             const sortedControllers = airportControllers[icao].sort((a, b) => {
                 if (a.position === 'Tower') return -1;
                 if (b.position === 'Tower') return 1;
@@ -1011,6 +1393,7 @@ HTML_TEMPLATE = """
                 atcContainer.appendChild(positionDiv);
             });
 
+            // If no active controllers, show message
             if (!hasActiveControllers) {
                 atcContainer.innerHTML = `
                     <div class="atc-position">
@@ -1020,6 +1403,7 @@ HTML_TEMPLATE = """
             }
         });
 
+        // Handle airports without controllers
         document.querySelectorAll('.airport-section').forEach(section => {
             const icao = section.id.replace('airport-', '');
             const atcContainer = document.querySelector(`#atc-${icao}`);
@@ -1034,8 +1418,10 @@ HTML_TEMPLATE = """
         });
     }
 
+    // Store collapsed airport state
     const collapsedAirports = JSON.parse(localStorage.getItem('collapsedAirports') || '{}');
-
+    
+    // Function to toggle airport state
     function toggleAirport(icao) {
         const content = document.getElementById(`content-${icao}`);
         const icon = document.querySelector(`#airport-${icao} h2 .toggle-icon`);
@@ -1054,9 +1440,11 @@ HTML_TEMPLATE = """
             collapsedAirports[icao] = true;
         }
         
+        // Save state to localStorage
         localStorage.setItem('collapsedAirports', JSON.stringify(collapsedAirports));
     }
-
+    
+    // Function to expand all airports
     function expandAllAirports() {
         const airports = document.querySelectorAll('.airport-section');
         airports.forEach(airport => {
@@ -1073,7 +1461,8 @@ HTML_TEMPLATE = """
         
         localStorage.setItem('collapsedAirports', JSON.stringify(collapsedAirports));
     }
-
+    
+    // Function to collapse all airports
     function collapseAllAirports() {
         const airports = document.querySelectorAll('.airport-section');
         airports.forEach(airport => {
@@ -1090,13 +1479,15 @@ HTML_TEMPLATE = """
         
         localStorage.setItem('collapsedAirports', JSON.stringify(collapsedAirports));
     }
-
+    
+    // Function to filter LIVE flights
     function toggleLiveFilter() {
         const btn = document.getElementById('toggleLive');
         if (!btn) return;
         
         const showLiveOnly = btn.classList.toggle('active');
         
+        // Save filter state
         localStorage.setItem('showLiveOnly', showLiveOnly);
         
         const flightCards = document.querySelectorAll('.flight-card');
@@ -1111,7 +1502,8 @@ HTML_TEMPLATE = """
                 card.style.display = 'block';
             }
         });
-
+        
+        // Update LIVE flight counters
         updateLiveCounts();
     }
     
@@ -1120,10 +1512,13 @@ HTML_TEMPLATE = """
         const airports = document.querySelectorAll('.airport-section');
         airports.forEach(airport => {
             const icao = airport.id.replace('airport-', '');
-
+            
+            // Count LIVE departures
             const liveDepCount = airport.querySelectorAll('.flight-card[data-live="True"][data-type="departure"]').length;
+            // Count LIVE arrivals
             const liveArrCount = airport.querySelectorAll('.flight-card[data-live="True"][data-type="arrival"]').length;
-
+            
+            // Update display
             const liveDepElement = airport.querySelector('.live-count .departure-count');
             const liveArrElement = airport.querySelector('.live-count .arrival-count');
             
@@ -1132,7 +1527,9 @@ HTML_TEMPLATE = """
         });
     }
     
+    // Restore state when page loads
     document.addEventListener('DOMContentLoaded', () => {
+        // Restore collapsed airports
         Object.keys(collapsedAirports).forEach(icao => {
             if (collapsedAirports[icao]) {
                 const content = document.getElementById(`content-${icao}`);
@@ -1144,6 +1541,7 @@ HTML_TEMPLATE = """
             }
         });
         
+        // Restore LIVE filter
         const showLiveOnly = localStorage.getItem('showLiveOnly') === 'true';
         if (showLiveOnly) {
             const btn = document.getElementById('toggleLive');
@@ -1153,13 +1551,33 @@ HTML_TEMPLATE = """
             }
         }
         
+        // Restore taxi time visibility
+        const hideTaxiTime = localStorage.getItem('hideTaxiTime') === 'true';
+        if (hideTaxiTime) {
+            document.getElementById('toggleTaxiTime').classList.remove('active');
+            document.querySelectorAll('.taxi-time').forEach(el => el.style.display = 'none');
+        }
+        
+        // Restore OBT time visibility
+        const hideObtTime = localStorage.getItem('hideObtTime') === 'true';
+        if (hideObtTime) {
+            document.getElementById('toggleObtTime').classList.remove('active');
+            document.querySelectorAll('.obt-time').forEach(el => el.style.display = 'none');
+        }
+        
+        // Assign event handlers
         document.getElementById('toggleLive')?.addEventListener('click', toggleLiveFilter);
         document.getElementById('expandAll')?.addEventListener('click', expandAllAirports);
         document.getElementById('collapseAll')?.addEventListener('click', collapseAllAirports);
-
+        document.getElementById('toggleTaxiTime')?.addEventListener('click', toggleTaxiTime);
+        document.getElementById('toggleObtTime')?.addEventListener('click', toggleObtTime);
+        
+        // Initialize LIVE flight counters
         updateLiveCounts();
-
+        
+        // Load ATC data
         loadAtcData();
+        // Update every 30 seconds
         setInterval(loadAtcData, 30000);
     });
 </script>
@@ -1172,107 +1590,124 @@ HTML_TEMPLATE = """
 
 @app.route('/api/flight/<callsign>')
 def get_flight_details(callsign):
-	flight_data = flights_data['aircrafts'].get(normalize_callsign(callsign), {})
-	flight_plans = load_flight_plans()
-	fpl = flight_plans.get(normalize_callsign(callsign), {})
+    # Get flight data from storage
+    flight_data = flights_data['aircrafts'].get(normalize_callsign(callsign), {})
 
-	position = "---"
-	if 'position' in flight_data:
-		if isinstance(flight_data['position'], dict):
-			x = flight_data['position'].get("x", "---")
-			y = flight_data['position'].get("y", "---")
-			position = f"{x}, {y}"
-		else:
-			position = str(flight_data['position'])
+    # Get flight plan data
+    flight_plans = load_flight_plans()
+    fpl = flight_plans.get(normalize_callsign(callsign), {})
+    aircraft_type = flight_data.get('aircraftType', fpl.get('aircraft', 'Unknown'))
 
-	print(flight_data.get('aircraft', fpl.get('aircraft', 'Unknown')), callsign)
-	response = {
-		'altitude': flight_data.get('altitude', '---'),
-		'speed': flight_data.get('speed', '---'),
-		'heading': flight_data.get('heading', '---'),
-		'route': fpl.get('route', '---'),
-		'position': position,
-		'wind': flight_data.get('wind', '---'),
-		'groundspeed': flight_data.get('groundSpeed', flight_data.get('speed', '---')),
-		'aircraft': flight_data.get('aircraft', fpl.get('aircraft', 'Unknown')),  # Изменили aircraftType на aircraft
-		'aircraftType': AIRCRAFT_SHORT_NAMES.get(flight_data.get('aircraft', fpl.get('aircraft', 'Unknown')), 'unknown')  # Добавили сокращенный тип
-	}
+    # Format position
+    position = "---"
+    if 'position' in flight_data:
+        if isinstance(flight_data['position'], dict):
+            x = flight_data['position'].get("x", "---")
+            y = flight_data['position'].get("y", "---")
+            position = f"{x}, {y}"
+        else:
+            position = str(flight_data['position'])
 
-	return jsonify(response)
+    # Prepare response data
+    print(flight_data.get('aircraft', fpl.get('aircraft', 'Unknown')), callsign)
+    response = {
+        'altitude': flight_data.get('altitude', '---'),
+        'speed': flight_data.get('speed', '---'),
+        'heading': flight_data.get('heading', '---'),
+        'route': fpl.get('route', '---'),
+        'position': position,
+        'wind': flight_data.get('wind', '---'),
+        'groundspeed': flight_data.get('groundSpeed', flight_data.get('speed', '---')),
+        'aircraft': aircraft_type,
+        'aircraftType': AIRCRAFT_SHORT_NAMES.get(flight_data.get('aircraft', fpl.get('aircraft', 'Unknown')), 'unknown')  # Добавили сокращенный тип
+    }
+
+    return jsonify(response)
 
 
 @app.route('/api/aircraft-image/<aircraft_type>/<callsign_prefix>')
 def get_aircraft_image(aircraft_type, callsign_prefix):
-	callsign_prefix = callsign_prefix.lower()
-	short_type = AIRCRAFT_SHORT_NAMES.get(aircraft_type, aircraft_type.split()[-1].lower())
-	base_url = "https://raw.githubusercontent.com/deepslatetile/24schedule/main/pictures"
-	matching_images = []
+    # Получаем данные о самолете из вебсокета
+    flight_data = flights_data['aircrafts'].get(normalize_callsign(callsign_prefix), {})
 
-	for image_name in AIRCRAFT_IMAGES:
-		parts = image_name.split('_', 3)
-		if len(parts) < 4:
-			continue
+    # Используем тип самолёта из данных вебсокета
+    aircraft_type = flight_data.get('aircraft', aircraft_type)
 
-		img_type = parts[0]
-		img_airline = parts[1]
-		img_index = parts[2]
-		img_author = parts[3]
+    short_type = AIRCRAFT_SHORT_NAMES.get(aircraft_type, aircraft_type.split()[-1])
+    base_url = "https://raw.githubusercontent.com/deepslatetile/24schedule/main/pictures"
+    
+    print(aircraft_type, short_type, callsign_prefix)
 
-		if img_type == short_type and img_airline == callsign_prefix:
-			matching_images.append({
-				'author': img_author,
-				'filename': image_name + '.png'
-			})
+    matching_images = []
+    for image_name in AIRCRAFT_IMAGES:
+        parts = image_name.split('_', 3)
+        if len(parts) < 4:
+            continue
 
-	if matching_images:
-		selected_image = random.choice(matching_images)
-		return jsonify({
-			'imageUrl': f"{base_url}/{selected_image['filename']}",
-			'author': selected_image['author']
-		})
+        img_type = parts[0]
+        img_airline = parts[1]
+        img_index = parts[2]
+        img_author = parts[3]
 
-	generic_images = []
-	for image_name in AIRCRAFT_IMAGES:
-		if image_name.startswith(short_type + '_'):
-			parts = image_name.split('_')
-			img_author = ' '.join(parts[3:])
-			generic_images.append({
-				'author': img_author,
-				'filename': image_name + '.png'
-			})
+        # Проверяем совпадение типа и авиакомпании
+        if img_type == short_type and img_airline == callsign_prefix:
+            matching_images.append({
+                'author': img_author,
+                'filename': image_name + '.png'
+            })
 
-	if generic_images:
-		selected_image = random.choice(generic_images)
-		return jsonify({
-			'imageUrl': f"{base_url}/{selected_image['filename']}",
-			'author': selected_image['author']
-		})
+    # Если нашли подходящие изображения, выбираем случайное
+    if matching_images:
+        selected_image = random.choice(matching_images)
+        return jsonify({
+            'imageUrl': f"{base_url}/{selected_image['filename']}",
+            'author': selected_image['author']
+        })
 
-	return jsonify({'imageUrl': None, 'author': None}), 404
+    # Если не нашли, пробуем найти любое изображение этого типа
+    generic_images = []
+    for image_name in AIRCRAFT_IMAGES:
+        if image_name.startswith(short_type + '_'):
+            parts = image_name.split('_')
+            img_author = ' '.join(parts[3:])
+            generic_images.append({
+                'author': img_author,
+                'filename': image_name + '.png'
+            })
+
+    if generic_images:
+        selected_image = random.choice(generic_images)
+        return jsonify({
+            'imageUrl': f"{base_url}/{selected_image['filename']}",
+            'author': selected_image['author']
+        })
+
+    # Если ничего не найдено
+    return jsonify({'imageUrl': None, 'author': None}), 404
 
 
 def icon_for_state(state):
-	icons = {
-		0: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/boarding.png',
-		1: 'https://raw.githubusercontent.com/deepslatetile/24schedule/refs/heads/main/taxiing.png',
-		2: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/departure.png',
-		3: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/cruise.png',
-		4: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/arrival.png',
-		5: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/ground.png'
-	}
-	return icons.get(state, '')
+    icons = {
+        0: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/boarding.png',
+        1: 'https://raw.githubusercontent.com/deepslatetile/24schedule/refs/heads/main/taxiing.png',
+        2: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/departure.png',
+        3: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/cruise.png',
+        4: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/arrival.png',
+        5: 'https://raw.githubusercontent.com/deepslatetile/24schedule/c5cbe3d8bc5e3028a7872edd61ce78172aba82c9/ground.png'
+    }
+    return icons.get(state, '')
 
 
 def description_for_state(state):
-	descriptions = {
-		0: 'Boarding',
-		1: 'Taxiing',
-		2: 'Climbing',
-		3: 'Cruising',
-		4: 'Descending',
-		5: 'Arrived'
-	}
-	return descriptions.get(state, '')
+    descriptions = {
+        0: 'Boarding',
+        1: 'Taxiing',
+        2: 'Climbing',
+        3: 'Cruising',
+        4: 'Descending',
+        5: 'Arrived'
+    }
+    return descriptions.get(state, '')
 
 
 app.jinja_env.filters['icon_for_state'] = icon_for_state
@@ -1281,184 +1716,177 @@ app.jinja_env.filters['description_for_state'] = description_for_state
 
 @app.route('/')
 def index():
-	flight_plans = get_recent_flight_plans()
-	current_time = datetime.now()
+    # Загружаем актуальные flight plans
+    flight_plans = get_recent_flight_plans()
+    current_time = datetime.now()
 
-	flights_data['departures'] = defaultdict(list)
-	flights_data['arrivals'] = defaultdict(list)
+    # Очищаем предыдущие данные
+    flights_data['departures'] = defaultdict(list)
+    flights_data['arrivals'] = defaultdict(list)
 
-	for realcallsign, plan in flight_plans.items():
-		if not all(key in plan for key in ['departing', 'arriving', 'aircraft']):
-			continue
+    # Обрабатываем каждый flight plan
+    for realcallsign, plan in flight_plans.items():
+        if not all(key in plan for key in ['departing', 'arriving', 'aircraft']):
+            continue
+        
+        # Получаем отображаемый callsign (если есть в плане, иначе используем realcallsign)
+        display_callsign = normalize_callsign(plan.get('callsign', realcallsign))
+        flight_level = str(plan.get('flightlevel', '0')).replace('FL', '').strip()
 
-		display_callsign = normalize_callsign(plan.get('callsign', realcallsign))
-		flight_level = str(plan.get('flightlevel', '0')).replace('FL', '').strip()
+        flight_info = {
+            'callsign': display_callsign,
+            'realcallsign': realcallsign,  # Добавляем realcallsign
+            'aircraft': plan['aircraft'],
+            'flightlevel': flight_level,
+            'playerName': plan.get('robloxName', 'Unknown'),
+            'timestamp': plan['timestamp'],
+            'time': datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M'),
+            'live': realcallsign in flights_data['aircrafts'],
+            'is_local': plan['departing'] == plan['arriving'],
+            'departing_name': AIRPORTS.get(plan['departing'], {}).get('name', plan['departing']),
+            'arriving_name': AIRPORTS.get(plan['arriving'], {}).get('name', plan['arriving'])
+        }
 
-		flight_info = {
-			'callsign': display_callsign,
-			'realcallsign': realcallsign,
-			'aircraft': plan['aircraft'],
-			'flightlevel': flight_level,
-			'playerName': plan.get('robloxName', 'Unknown'),
-			'timestamp': plan['timestamp'],
-			'time': datetime.strptime(plan['timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%H:%M'),
-			'live': realcallsign in flights_data['aircrafts'],
-			'is_local': plan['departing'] == plan['arriving'],
-			'departing_name': AIRPORTS.get(plan['departing'], {}).get('name', plan['departing']),
-			'arriving_name': AIRPORTS.get(plan['arriving'], {}).get('name', plan['arriving'])
-		}
+        # Добавляем в departures
+        if not flight_info['is_local'] or plan['departing'] in AIRPORTS:
+            departure_info = flight_info.copy()
+            departure_info.update({
+                'departing': plan['departing'],
+                'arriving': plan['arriving'],
+                'state': 0
+            })
+            flights_data['departures'][plan['departing']].append(departure_info)
 
-		if not flight_info['is_local'] or plan['departing'] in AIRPORTS:
-			departure_info = flight_info.copy()
-			departure_info.update({
-				'departing': plan['departing'],
-				'arriving': plan['arriving'],
-				'state': 0
-			})
-			flights_data['departures'][plan['departing']].append(departure_info)
+        # Добавляем в arrivals
+        if not flight_info['is_local'] or plan['arriving'] in AIRPORTS:
+            arrival_info = flight_info.copy()
+            arrival_info.update({
+                'departing': plan['departing'],
+                'arriving': plan['arriving'],
+                'state': 0
+            })
+            flights_data['arrivals'][plan['arriving']].append(arrival_info)
 
-		if not flight_info['is_local'] or plan['arriving'] in AIRPORTS:
-			arrival_info = flight_info.copy()
-			arrival_info.update({
-				'departing': plan['departing'],
-				'arriving': plan['arriving'],
-				'state': 0
-			})
-			flights_data['arrivals'][plan['arriving']].append(arrival_info)
-
-	update_flight_statuses()
-	sorted_airports = get_sorted_airports()
-
-	return render_template_string(
-		HTML_TEMPLATE,
-		airports=get_sorted_airports(),
-		departures=flights_data['departures'],
-		arrivals=flights_data['arrivals'],
-		AIRPORTS=AIRPORTS,
-		current_time=current_time.strftime('%Y-%m-%d %H:%M:%S')
-	)
+    # Обновляем статусы для активных рейсов
+    update_flight_statuses()
+    
+    sorted_airports = get_sorted_airports()
+    
+    return render_template_string(
+        HTML_TEMPLATE,
+        airports=sorted_airports,  # Передаем весь список кортежей
+        departures=flights_data['departures'],
+        arrivals=flights_data['arrivals'],
+        AIRPORTS=AIRPORTS,
+        current_time=current_time.strftime('%Y-%m-%d %H:%M:%S')
+    )
 
 
 def get_flight_state(realcallsign, acft_data):
-	normalized_callsign = normalize_callsign(realcallsign)
-	realcallsign = normalized_callsign
+    normalized_callsign = normalize_callsign(realcallsign)
+    realcallsign = normalized_callsign
+    
+    if not acft_data:
+        return None
 
-	if not acft_data:
-		wh_log(f"{realcallsign} check: No aircraft data")
-		return None
+    flight_plans = load_flight_plans()
+    fpl = flight_plans.get(realcallsign)
+    
+    if not fpl:
+        return None
 
-	flight_plans = load_flight_plans()
-	fpl = flight_plans.get(realcallsign)
+    prev_state = flights_data['flight_states'].get(realcallsign, 0)
+    speed = acft_data.get('speed', 0)
+    is_on_ground = acft_data.get('isOnGround', True)
+    altitude = acft_data.get('altitude', 0)
 
-	if not fpl:
-		wh_log(f"{realcallsign} check: Flight plan not found")
-		return None
+    try:
+        flight_level = int(fpl["flightlevel"]) * 100
+    except:
+        flight_level = 0
 
-	prev_state = flights_data['flight_states'].get(realcallsign, 0)
-	speed = acft_data.get('speed', 0)
-	is_on_ground = acft_data.get('isOnGround', True)
-	altitude = acft_data.get('altitude', 0)
-	flight_level = 0
-	try:
-		flight_level = int(fpl["flightlevel"]) * 100
-	except:
-		flight_level = 0
-		wh_log(f"{normalized_callsign} check: Invalid flight level in FPL: {fpl.get('flightlevel', 'N/A')}")
+    new_state = prev_state
 
-	normalized_callsign = normalize_callsign(realcallsign)
-	log_message = (
-		f"{normalized_callsign}\n"
-		f"FPL FL: {flight_level}ft, "
-		f"{altitude}ft "
-		f"{speed}kts "
-		f"{is_on_ground} "
-		f"{prev_state}\n"
-	)
-	print(log_message)
+    if is_on_ground:
+        if speed > 10 and prev_state == 0:
+            new_state = 1
+        elif speed < 30 and prev_state in [2, 3, 4]:
+            new_state = 5
+    else:
+        if prev_state in [0, 1]:
+            new_state = 2
+        elif prev_state == 2 and altitude > (flight_level - 300):
+            new_state = 3
+        elif prev_state == 3 and altitude < (flight_level - 400):
+            new_state = 4
 
-	new_state = prev_state
+    if new_state != prev_state:
+        flights_data['flight_states'][normalized_callsign] = new_state
+        # Записываем время изменения состояния
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if 'state_history' not in flights_data['aircrafts'].get(normalized_callsign, {}):
+            flights_data['aircrafts'][normalized_callsign]['state_history'] = {}
+        flights_data['aircrafts'][normalized_callsign]['state_history'][current_time] = new_state
 
-	if is_on_ground:
-		if speed > 10 and prev_state == 0:
-			new_state = 1  # departing
-		elif speed < 30 and prev_state in [2, 3, 4]:
-			new_state = 5  # landed
-	else:
-		if prev_state in [0, 1]:
-			new_state = 2  # climbing
-		elif prev_state == 2 and altitude > (flight_level - 300):
-			new_state = 3  # cruise
-		elif prev_state == 3 and altitude < (flight_level - 400):
-			new_state = 4  # descending
-
-	if new_state != prev_state:
-		state_change_msg = (
-			f"{normalized_callsign} STATE CHANGE: "
-			f"{prev_state}->{new_state} | "
-			f"FL: {flight_level}ft | "
-			f"Alt: {altitude}ft | "
-			f"Speed: {speed}kts | "
-			f"OnGround: {is_on_ground}"
-		)
-		# print(state_change_msg)
-		flights_data['flight_states'][normalized_callsign] = new_state
-	else:
-		pass
-
-	return new_state
+    return new_state
 
 
 def update_flight_statuses():
-	for realcallsign, acft_data in flights_data['aircrafts'].items():
-		display_callsign = acft_data.get('callsign', realcallsign)
+    for realcallsign, acft_data in flights_data['aircrafts'].items():
+        # Получаем отображаемый позывной
+        display_callsign = acft_data.get('callsign', realcallsign)
+        
+        # Обновляем departures
+        for airport, flights in flights_data['departures'].items():
+            for flight in flights:
+                # Безопасное сравнение позывных
+                flight_realcallsign = flight.get('realcallsign', flight.get('callsign', ''))
+                if normalize_callsign(flight_realcallsign) == normalize_callsign(realcallsign):
+                    flight['live'] = True
+                    flight['state'] = get_flight_state(realcallsign, acft_data)
+                    flight['callsign'] = display_callsign
 
-		for airport, flights in flights_data['departures'].items():
-			for flight in flights:
-				flight_realcallsign = flight.get('realcallsign', flight.get('callsign', ''))
-				if normalize_callsign(flight_realcallsign) == normalize_callsign(realcallsign):
-					flight['live'] = True
-					flight['state'] = get_flight_state(realcallsign, acft_data)
-					flight['callsign'] = display_callsign
-
-		for airport, flights in flights_data['arrivals'].items():
-			for flight in flights:
-				flight_realcallsign = flight.get('realcallsign', flight.get('callsign', ''))
-				if normalize_callsign(flight_realcallsign) == normalize_callsign(realcallsign):
-					flight['live'] = True
-					flight['state'] = get_flight_state(realcallsign, acft_data)
-					flight['callsign'] = display_callsign
-
+        # Обновляем arrivals
+        for airport, flights in flights_data['arrivals'].items():
+            for flight in flights:
+                # Безопасное сравнение позывных
+                flight_realcallsign = flight.get('realcallsign', flight.get('callsign', ''))
+                if normalize_callsign(flight_realcallsign) == normalize_callsign(realcallsign):
+                    flight['live'] = True
+                    flight['state'] = get_flight_state(realcallsign, acft_data)
+                    flight['callsign'] = display_callsign
+                    
 
 async def websocket_listener():
-	uri = "wss://24data.ptfs.app/wss"
-	while True:
-		try:
-			async with websockets.connect(uri) as websocket:
-				while True:
-					message = await websocket.recv()
-					data = json.loads(message)
-					if data['t'] == "ACFT_DATA":
-						refresh_acft(data['d'])
-					elif data['t'] == "FLIGHT_PLAN":
-						new_fpl(data['d'])
+    uri = "wss://24data.ptfs.app/wss"
+    while True:
+        try:
+            async with websockets.connect(uri) as websocket:
+                while True:
+                    message = await websocket.recv()
+                    data = json.loads(message)
+                    if data['t'] == "ACFT_DATA":
+                        refresh_acft(data['d'])
+                    elif data['t'] == "FLIGHT_PLAN":
+                        new_fpl(data['d'])
 
-					update_flight_statuses()
-		except Exception as e:
-			print(f"WebSocket error: {e}")
-			await asyncio.sleep(5)
+                    update_flight_statuses()
+        except Exception as e:
+            print(f"WebSocket error: {e}")
+            await asyncio.sleep(5)
 
 
 def run_websocket():
-	loop = asyncio.new_event_loop()
-	asyncio.set_event_loop(loop)
-	loop.run_until_complete(websocket_listener())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(websocket_listener())
 
 
 def run_flask():
-	app.run(host='0.0.0.0', port=62424, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=2424, debug=True, use_reloader=False)
 
 
 if __name__ == '__main__':
-	ws_thread = threading.Thread(target=run_websocket, daemon=True)
-	ws_thread.start()
-	run_flask()
+    ws_thread = threading.Thread(target=run_websocket, daemon=True)
+    ws_thread.start()
+    run_flask()
