@@ -621,13 +621,26 @@ def calculate_airport_stats():
 	return airport_stats
 
 
+def get_active_arpts():
+	active = []
+	for callsign, data in dsr.items():
+		if data.get('departure') and data.get('arrival'):
+			dep = data['departure']
+			arr = data['arrival']
+			if dep not in active:
+				active.append(dep)
+			if arr not in active:
+				active.append(arr)
+	return active
+
+
 def fetch_atc_data():
 	try:
 		response = requests.get('https://24data.ptfs.app/controllers', timeout=5)
 		response.raise_for_status()
 		controllers = response.json()
 
-		active_arpt = []
+		active_arpt = get_active_arpts()
 		filtered_controllers = []
 		for controller in controllers:
 			if controller.get("holder"):
@@ -658,14 +671,13 @@ def fetch_atc_data():
 					}
 
 		major_arpt = 'ISAU IGRV ITKO IPPH IZOL ILAR IBTH IRFD'.split(' ')
-
+		print("Active FIRs:", ", ".join(active_firs))
 		controllers_copy = filtered_controllers.copy()
 
 		for mj in controllers_copy:
 			airport_icao = mj["airport"]
 			if airport_icao not in major_arpt:
 				if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
-
 					fir = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
 					if fir in active_firs:
 						ctr_key = f"{fir}_CTR"
@@ -681,14 +693,12 @@ def fetch_atc_data():
 		# СОРТИРОВКА: сначала CTR, потом TWR, потом GND, потом остальные
 		position_priority = {'CTR': 0, 'TWR': 1, 'GND': 2}
 
-
 		def sort_key(controller):
 			pos = controller['position']
 			# Если позиция есть в приоритетах - используем приоритет, иначе ставим в конец
 			priority = position_priority.get(pos, 99)
 			# Дополнительно сортируем по аэропорту для одинаковых позиций
-			return (priority, controller['airport'])
-
+			return priority, controller['airport']
 
 		# Сортируем контроллеров
 		filtered_controllers.sort(key=sort_key)
