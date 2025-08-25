@@ -10,7 +10,7 @@ import requests
 from flask_cors import CORS
 
 app = Flask(__name__)
-cors_origins = ["https://two4schedule.onrender.com", "http://localhost:*", "http://127.0.0.1:*"]
+cors_origins = ["*"]
 CORS(app, origins=cors_origins)
 
 # Global data stores
