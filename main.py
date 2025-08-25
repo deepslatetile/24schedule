@@ -753,4 +753,4 @@ if __name__ == "__main__":
 	atc_thread.start()
 
 	print("Starting Flask application...")
-	app.run(port=2424, debug=True)
+	app.run(port=10000, debug=False)
