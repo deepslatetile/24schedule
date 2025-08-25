@@ -326,7 +326,7 @@ def process_websocket_data(wss_data):
 		elif msg_type == "EVENT_FLIGHT_PLAN":
 			process_flight_plan(msg_data, event=True, received_at=received_at)
 
-		# print(dsr)
+	# print(dsr)
 
 	except json.JSONDecodeError as e:
 		print(f"JSON decode error: {e}")
@@ -627,30 +627,83 @@ def fetch_atc_data():
 		response.raise_for_status()
 		controllers = response.json()
 
+		active_arpt = []
 		filtered_controllers = []
 		for controller in controllers:
-			position = controller.get("position")
-
-			if controller.get("airport") == "ATC 24 Staff Chat":
-				position = "Staff"
+			if controller.get("holder"):
+				active_arpt.append(CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")))
 
 			filtered_controllers.append({
 				"holder": controller.get("holder"),
 				"airport": CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")),
-				"position": position,
+				"position": controller.get("position"),
 				"queue": controller.get("queue", []),
-				"frequency": FREQ_LIST.get(f'{controller.get("airport")}_{position}')
+				"frequency": FREQ_LIST.get(f'{controller.get("airport")}_{controller.get("position")}')
 			})
 
-		# Обновляем глобальную переменную
+		active_boys = {}
+		active_firs = []
+
+		for bigboy in filtered_controllers:
+			if bigboy["holder"] and bigboy["position"] == "CTR":
+				airport_icao = bigboy['airport']
+				if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
+					fir_airport = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
+					active_firs.append(fir_airport)
+
+					active_boys[f"{airport_icao}_CTR"] = {
+						"holder": bigboy["holder"],
+						"queue": bigboy["queue"],
+						"frequency": bigboy["frequency"],
+					}
+
+		major_arpt = 'ISAU IGRV ITKO IPPH IZOL ILAR IBTH IRFD'.split(' ')
+
+		controllers_copy = filtered_controllers.copy()
+
+		for mj in controllers_copy:
+			airport_icao = mj["airport"]
+			if airport_icao not in major_arpt:
+				if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
+
+					fir = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
+					if fir in active_firs:
+						ctr_key = f"{fir}_CTR"
+						if ctr_key in active_boys and airport_icao in active_arpt:
+							filtered_controllers.append({
+								"holder": active_boys[ctr_key]["holder"],
+								"airport": airport_icao,
+								"position": f"CTR",
+								"queue": active_boys[ctr_key]["queue"],
+								"frequency": active_boys[ctr_key]["frequency"]
+							})
+
+		# СОРТИРОВКА: сначала CTR, потом TWR, потом GND, потом остальные
+		position_priority = {'CTR': 0, 'TWR': 1, 'GND': 2}
+
+
+		def sort_key(controller):
+			pos = controller['position']
+			# Если позиция есть в приоритетах - используем приоритет, иначе ставим в конец
+			priority = position_priority.get(pos, 99)
+			# Дополнительно сортируем по аэропорту для одинаковых позиций
+			return (priority, controller['airport'])
+
+
+		# Сортируем контроллеров
+		filtered_controllers.sort(key=sort_key)
+
 		global atc
 		atc = filtered_controllers
 
 		pepe = []
 		for ps in filtered_controllers:
 			if ps["holder"]:
-				pepe.append(ps["airport"] + "_" + ps["position"] + f" ({len(ps['queue'])})".replace(" (0)", ""))
-		print(", ".join(pepe))
+				queue_count = len(ps['queue'])
+				queue_str = f" ({queue_count})" if queue_count > 0 else ""
+				pepe.append(ps["airport"] + "_" + ps["position"] + queue_str)
+
+		print("Active controllers:", ", ".join(pepe))
 		print("ATC data updated successfully")
 
 	except requests.exceptions.RequestException as e:
@@ -659,6 +712,9 @@ def fetch_atc_data():
 		print(f"Error parsing ATC data: {e}")
 	except Exception as e:
 		print(f"Unexpected error in fetch_atc_data: {e}")
+		import traceback
+
+		traceback.print_exc()
 
 
 def run_atc_updater():

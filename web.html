@@ -1,1060 +1,1100 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>24schedule</title>
-        <style>
-            :root {
-                --bg-color: #121212;
-                --card-color: #1e1e1e;
-                --text-color: #e0e0e0;
-                --accent-color: #3a86ff;
-                --border-color: #333333;
-                --secondary-text: #b0b0b0;
-                --live-accent: #ff4d4d;
-                --atc-staff: #d00ddd;
-                --atc-center: #00FFFF;
-                --atc-tower: #00FFFF;
-                --atc-ground: #00FFFF;
-                --refresh-off: #555555;
-                --refresh-on: #ff4d4d;
-            }
-
-            body {
-                font-family: 'Segoe UI', system-ui, sans-serif;
-                background-color: var(--bg-color);
-                color: var(--text-color);
-                margin: 0;
-                padding: 20px;
-            }
-
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-            }
-
-            h1 {
-                text-align: center;
-                margin-bottom: 30px;
-                color: var(--accent-color);
-            }
-
-            .filters {
-                display: flex;
-                flex-direction: column;
-                gap: 5px;
-                margin-bottom: 20px;
-            }
-
-            .filter-btn {
-                padding: 8px 16px;
-                background-color: var(--card-color);
-                color: var(--text-color);
-                border: 1px solid var(--border-color);
-                border-radius: 4px;
-                cursor: pointer;
-                transition: all 0.2s;
-            }
-
-            .filter-btn:hover {
-                background-color: var(--accent-color);
-                color: white;
-            }
-
-            .filter-btn.active {
-                background-color: var(--accent-color);
-                color: white;
-            }
-
-            .refresh-container {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .refresh-label {
-                font-size: 14px;
-                cursor: pointer;
-            }
-
-            .refresh-checkbox {
-                position: relative;
-                width: 40px;
-                height: 20px;
-                -webkit-appearance: none;
-                appearance: none;
-                background: var(--refresh-off);
-                outline: none;
-                border-radius: 20px;
-                cursor: pointer;
-                transition: all 0.3s;
-            }
-
-            .refresh-checkbox:checked {
-                background: var(--refresh-on);
-            }
-
-            .refresh-checkbox::before {
-                content: '';
-                position: absolute;
-                width: 16px;
-                height: 16px;
-                border-radius: 50%;
-                top: 2px;
-                left: 2px;
-                background: #fff;
-                transition: all 0.3s;
-            }
-
-            .refresh-checkbox:checked::before {
-                left: 22px;
-            }
-
-            .airport-section {
-                background-color: var(--card-color);
-                border-radius: 8px;
-                padding: 16px;
-                margin-bottom: 24px;
-                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-                border: 1px solid var(--border-color);
-            }
-
-            .airport-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 15px;
-                padding-bottom: 10px;
-                border-bottom: 1px solid var(--border-color);
-            }
-
-            .airport-name {
-                font-size: 20px;
-                font-weight: 600;
-                color: var(--accent-color);
-            }
-
-            .flight-counts {
-                display: flex;
-                gap: 10px;
-            }
-
-            .count {
-                background-color: #252525;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 14px;
-            }
-
-            .departure-count {
-                color: #4CAF50;
-            }
-
-            .arrival-count {
-                color: #FF5722;
-            }
-
-            .flight-card {
-                background-color: #252525;
-                border-left: 3px solid var(--accent-color);
-                padding: 12px;
-                margin-bottom: 12px;
-                border-radius: 4px;
-                transition: transform 0.2s;
-                position: relative;
-                cursor: pointer;
-            }
-
-            .flight-card.live {
-                border-left-color: var(--live-accent);
-            }
-
-            .flight-card:hover {
-                transform: translateY(-2px);
-            }
-
-            .flight-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 8px;
-            }
-
-            .flight-callsign {
-                font-weight: 600;
-                font-size: 18px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .state-icon {
-                width: 24px;
-                height: 24px;
-                border-radius: 50%;
-                object-fit: contain;
-            }
-
-            .flight-aircraft {
-                color: var(--secondary-text);
-                font-size: 14px;
-            }
-
-            .flight-fplfiled {
-                color: #FFFFFF;
-                font-size: 14px;
-            }
-
-            .flight-details {
-                display: flex;
-                flex-direction: column;
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                gap: 10px;
-                margin-top: 10px;
-            }
-
-            .flight-details-expanded {
-                display: none;
-                margin-top: 12px;
-                padding: 12px;
-                background-color: #2a2a2a;
-                border-radius: 4px;
-                border-left: 3px solid var(--accent-color);
-            }
-
-            .detail-item {
-                display: flex;
-                flex-direction: column;
-            }
-
-            .detail-label {
-                font-size: 12px;
-                color: var(--secondary-text);
-            }
-
-            .detail-value {
-                font-size: 14px;
-            }
-
-            .live-badge {
-                background-color: var(--live-accent);
-                color: white;
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 12px;
-                font-weight: 500;
-                margin-left: 8px;
-            }
-
-            .section-title {
-                font-size: 18px;
-                margin: 15px 0 10px 0;
-                color: var(--text-color);
-            }
-
-            .no-flights {
-                color: var(--secondary-text);
-                font-style: italic;
-                text-align: center;
-                padding: 15px;
-            }
-
-            .loading {
-                text-align: center;
-                padding: 20px;
-                color: var(--secondary-text);
-            }
-
-            .atc-container {
-                margin: 15px 0;
-                display: flex;
-                flex-direction: column;
-                flex-wrap: wrap;
-                gap: 10px;
-            }
-
-            .atc-position {
-                background-color: #2a2a2a;
-                padding: 8px 12px;
-                border-radius: 6px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                min-width: 200px;
-            }
-
-            .atc-position.ground {
-                border-left: 3px solid var(--atc-ground);
-            }
-
-            .atc-position.tower {
-                border-left: 3px solid var(--atc-tower);
-            }
-
-            .atc-position.center {
-                border-left: 3px solid var(--atc-center);
-            }
-
-            .atc-position.staff {
-                border-left: 3px solid var(--atc-staff);
-            }
-
-            .atc-icon {
-                width: 20px;
-                height: 20px;
-            }
-
-            .atc-info {
-                flex-grow: 1;
-            }
-
-            .atc-holder {
-                font-weight: 500;
-            }
-
-            .atc-queue {
-                font-size: 12px;
-                color: var(--secondary-text);
-            }
-
-            .queue-count {
-                background-color: #333;
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 12px;
-            }
-
-            .atc-freq {
-                background-color: #333;
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 12px;
-                color: var(--atc-center);
-            }
-
-            .staff-chat {
-                margin-top: 20px;
-                padding: 15px;
-                background-color: #2a2a2a;
-                border-radius: 8px;
-                border-left: 3px solid #FF9800;
-            }
-
-            .staff-chat-title {
-                font-size: 18px;
-                font-weight: 600;
-                margin-bottom: 10px;
-                color: #FF9800;
-            }
-
-            .filter-switch {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: 10px;
-            }
-
-            .filter-label {
-                font-size: 14px;
-                cursor: pointer;
-            }
-
-            .filter-checkbox {
-                position: relative;
-                width: 40px;
-                height: 20px;
-                -webkit-appearance: none;
-                appearance: none;
-                background: var(--refresh-off);
-                outline: none;
-                border-radius: 20px;
-                cursor: pointer;
-                transition: all 0.3s;
-            }
-
-            .filter-checkbox:checked {
-                background: var(--accent-color);
-            }
-
-            .filter-checkbox::before {
-                content: '';
-                position: absolute;
-                width: 16px;
-                height: 16px;
-                border-radius: 50%;
-                top: 2px;
-                left: 2px;
-                background: #fff;
-                transition: all 0.3s;
-            }
-
-            .filter-checkbox:checked::before {
-                left: 22px;
-            }
-
-            .count[title] {
-                position: relative;
-                cursor: help;
-            }
-
-            .count[title]:hover::after {
-                content: attr(title);
-                position: absolute;
-                bottom: 100%;
-                left: 50%;
-                transform: translateX(-50%);
-                background: #333;
-                color: white;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 12px;
-                white-space: nowrap;
-                z-index: 10;
-            }
-
-            .time-green {
-                color: #4CAF50;
-            }
-
-            .time-orange {
-                color: #FF9800;
-            }
-
-            .time-red {
-                color: #F44336;
-            }
-
-            .weather-info {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                background-color: #2a2a2a;
-                padding: 6px 12px;
-                border-radius: 6px;
-                font-size: 14px;
-                margin-bottom: 15px;
-            }
-
-            .weather-icon {
-                width: 20px;
-                height: 20px;
-            }
-
-            .weather-hint {
-                color: var(--secondary-text);
-            }
-
-            .weather-value {
-                font-weight: 500;
-            }
-
-            #airportsContainer {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-                justify-content: center;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>24schedule</h1>
-            <div class="filters">
-                <div class="filter-switch">
-                    <span class="filter-label">Show LIVE only</span>
-                    <input type="checkbox" class="filter-checkbox" id="toggleLive" checked>
-                </div>
-                <div class="filter-switch">
-                    <span class="filter-label">Auto Refresh</span>
-                    <input type="checkbox" class="filter-checkbox" id="toggleRefresh">
-                </div>
-                <div class="filter-switch">
-                    <span class="filter-label">Show ATC</span>
-                    <input type="checkbox" class="filter-checkbox" id="toggleAtc">
-                </div>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24schedule</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #3a86ff;
+            --border-color: #333333;
+            --secondary-text: #b0b0b0;
+            --live-accent: #ff4d4d;
+            --atc-staff: #d00ddd;
+            --atc-center: #00FFFF;
+            --atc-tower: #00FFFF;
+            --atc-ground: #00FFFF;
+            --refresh-off: #555555;
+            --refresh-on: #ff4d4d;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--accent-color);
+        }
+
+        .filters {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background-color: var(--card-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .filter-btn.active {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .refresh-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-label {
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .refresh-checkbox {
+            position: relative;
+            width: 40px;
+            height: 20px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--refresh-off);
+            outline: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .refresh-checkbox:checked {
+            background: var(--refresh-on);
+        }
+
+        .refresh-checkbox::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            background: #fff;
+            transition: all 0.3s;
+        }
+
+        .refresh-checkbox:checked::before {
+            left: 22px;
+        }
+
+        .airport-section {
+            background-color: var(--card-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+        }
+
+        .airport-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .airport-name {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .flight-counts {
+            display: flex;
+            gap: 10px;
+        }
+
+        .count {
+            background-color: #252525;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .departure-count {
+            color: #4CAF50;
+        }
+
+        .arrival-count {
+            color: #FF5722;
+        }
+
+        .flight-card {
+            background-color: #252525;
+            border-left: 3px solid var(--accent-color);
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            transition: transform 0.2s;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .flight-card.live {
+            border-left-color: var(--live-accent);
+        }
+
+        .flight-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .flight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .flight-callsign {
+            font-weight: 600;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .state-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: contain;
+        }
+
+        .flight-aircraft {
+            color: var(--secondary-text);
+            font-size: 14px;
+        }
+
+        .flight-fplfiled {
+            color: #FFFFFF;
+            font-size: 14px;
+        }
+
+        .flight-details {
+            display: flex;
+            flex-direction: column;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .flight-details-expanded {
+            display: none;
+            margin-top: 12px;
+            padding: 12px;
+            background-color: #2a2a2a;
+            border-radius: 4px;
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: var(--secondary-text);
+        }
+
+        .detail-value {
+            font-size: 14px;
+        }
+
+        .live-badge {
+            background-color: var(--live-accent);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            margin: 15px 0 10px 0;
+            color: var(--text-color);
+        }
+
+        .no-flights {
+            color: var(--secondary-text);
+            font-style: italic;
+            text-align: center;
+            padding: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--secondary-text);
+        }
+
+        .atc-container {
+            margin: 15px 0;
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .atc-position {
+            background-color: #2a2a2a;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 200px;
+        }
+
+        .atc-position.ground {
+            border-left: 3px solid var(--atc-ground);
+        }
+
+        .atc-position.tower {
+            border-left: 3px solid var(--atc-tower);
+        }
+
+        .atc-position.center {
+            border-left: 3px solid var(--atc-center);
+        }
+
+        .atc-position.staff {
+            border-left: 3px solid var(--atc-staff);
+        }
+
+        .atc-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .atc-info {
+            flex-grow: 1;
+        }
+
+        .atc-holder {
+            font-weight: 500;
+        }
+
+        .atc-queue {
+            font-size: 12px;
+            color: var(--secondary-text);
+        }
+
+        .queue-count {
+            background-color: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .atc-freq {
+            background-color: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--atc-center);
+        }
+
+        .staff-chat {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            border-left: 3px solid #FF9800;
+        }
+
+        .staff-chat-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #FF9800;
+        }
+
+        .filter-switch {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .filter-label {
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .filter-checkbox {
+            position: relative;
+            width: 40px;
+            height: 20px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--refresh-off);
+            outline: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-checkbox:checked {
+            background: var(--accent-color);
+        }
+
+        .filter-checkbox::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            background: #fff;
+            transition: all 0.3s;
+        }
+
+        .filter-checkbox:checked::before {
+            left: 22px;
+        }
+
+        .count[title] {
+            position: relative;
+            cursor: help;
+        }
+
+        .count[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        .time-green {
+            color: #4CAF50;
+        }
+
+        .time-orange {
+            color: #FF9800;
+        }
+
+        .time-red {
+            color: #F44336;
+        }
+
+        .weather-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #2a2a2a;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .weather-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .weather-hint {
+            color: var(--secondary-text);
+        }
+
+        .weather-value {
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>24schedule</h1>
+        <div class="filters">
+            <div class="filter-switch">
+                <span class="filter-label">Show LIVE only</span>
+                <input type="checkbox" class="filter-checkbox" id="toggleLive" checked>
             </div>
-            <div class="weather-info" id="weatherInfo">
-                <img src="https://raw.githubusercontent.com/deepslatetile/24schedule/main/weather.png" alt="Weather" class="weather-icon">
-                <span class="weather-value">Loading wind data...</span>
+            <div class="filter-switch">
+                <span class="filter-label">Auto Refresh</span>
+                <input type="checkbox" class="filter-checkbox" id="toggleRefresh">
             </div>
-            <div id="airportsContainer">
-                <div class="loading">Loading flight data...</div>
+            <div class="filter-switch">
+                <span class="filter-label">Show ATC</span>
+                <input type="checkbox" class="filter-checkbox" id="toggleAtc">
             </div>
         </div>
-        <script>
-            // Configuration
-            const FLIGHTS_API_URL = 'http://localhost:2424/api/v1/dsr';
-            const ATC_API_URL = 'http://localhost:2424/api/v1/atc';
-            const ICON_BASE_URL = 'https://raw.githubusercontent.com/deepslatetile/24schedule/main/';
-            const AIRPORT_STATS_API_URL = 'http://localhost:2424/api/v1/airport_stats';
-            const REFRESH_INTERVAL = 5000;
-            // Flight states
-            const FLIGHT_STATES = {
-                0: {
-                    "name": "Boarding",
-                    "icon": "boarding.png"
-                },
-                1: {
-                    "name": "Taxiing",
-                    "icon": "taxiing.png"
-                },
-                2: {
-                    "name": "Climbing",
-                    "icon": "departure.png"
-                },
-                3: {
-                    "name": "Cruising",
-                    "icon": "cruise.png"
-                },
-                4: {
-                    "name": "Descending",
-                    "icon": "arrival.png"
-                },
-                5: {
-                    "name": "Arrived",
-                    "icon": "ground.png"
-                },
-                6: {
-                    "name": "Training",
-                    "icon": "training.png"
+
+        <div class="weather-info" id="weatherInfo">
+            <img src="https://raw.githubusercontent.com/deepslatetile/24schedule/main/weather.png" alt="Weather"
+                class="weather-icon">
+            <span class="weather-value">Loading wind data...</span>
+        </div>
+
+
+        <div id="airportsContainer">
+            <div class="loading">Loading flight data...</div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const FLIGHTS_API_URL = 'http://localhost:2424/api/v1/dsr';
+        const ATC_API_URL = 'http://localhost:2424/api/v1/atc';
+        const ICON_BASE_URL = 'https://raw.githubusercontent.com/deepslatetile/24schedule/main/';
+        const AIRPORT_STATS_API_URL = 'http://localhost:2424/api/v1/airport_stats';
+        const REFRESH_INTERVAL = 5000;
+
+        // Flight states
+        const FLIGHT_STATES = {
+            0: { "name": "Boarding", "icon": "boarding.png" },
+            1: { "name": "Taxiing", "icon": "taxiing.png" },
+            2: { "name": "Climbing", "icon": "departure.png" },
+            3: { "name": "Cruising", "icon": "cruise.png" },
+            4: { "name": "Descending", "icon": "arrival.png" },
+            5: { "name": "Arrived", "icon": "ground.png" },
+            6: { "name": "Training", "icon": "training.png" }
+        };
+
+        // State
+        let showLiveOnly = false;
+        let showAtc = false;
+        let autoRefreshEnabled = false;
+        let autoRefreshInterval = null;
+
+        // DOM Elements
+        const airportsContainer = document.getElementById('airportsContainer');
+        const toggleLiveBtn = document.getElementById('toggleLive');
+        const toggleRefreshBtn = document.getElementById('toggleRefresh');
+        const toggleAtcBtn = document.getElementById('toggleAtc');
+
+        // Fetch flight data from API
+        async function fetchFlightData() {
+            try {
+                const response = await fetch(FLIGHTS_API_URL);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch flight data');
                 }
-            };
-            // State
-            let showLiveOnly = false;
-            let showAtc = false;
-            let autoRefreshEnabled = false;
-            let autoRefreshInterval = null;
-            // DOM Elements
-            const airportsContainer = document.getElementById('airportsContainer');
-            const toggleLiveBtn = document.getElementById('toggleLive');
-            const toggleRefreshBtn = document.getElementById('toggleRefresh');
-            const toggleAtcBtn = document.getElementById('toggleAtc');
-            // Fetch flight data from API
-            async function fetchFlightData() {
-                try {
-                    const response = await fetch(FLIGHTS_API_URL);
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch flight data');
-                    }
-                    return await response.json();
-                } catch (error) {
-                    console.error('Error fetching flight data:', error);
-                    return null;
-                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching flight data:', error);
+                return null;
             }
-            // Fetch ATC data from API
-            async function fetchAtcData() {
-                try {
-                    const response = await fetch(ATC_API_URL);
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch ATC data');
-                    }
-                    return await response.json();
-                } catch (error) {
-                    console.error('Error fetching ATC data:', error);
-                    return null;
+        }
+
+        // Fetch ATC data from API
+        async function fetchAtcData() {
+            try {
+                const response = await fetch(ATC_API_URL);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch ATC data');
                 }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching ATC data:', error);
+                return null;
             }
-            // Process flight data and group by airports
-            function processFlightData(flightData) {
-                if (!flightData) return {};
-                const airports = {};
-                let unknownFlights = [];
-                // Process each flight
-                Object.entries(flightData).forEach(([callsign, flight]) => {
-                    if (!flight || (flight.live === false && showLiveOnly)) return;
-                    const departure = flight.departure || 'ZZZZ';
-                    const arrival = flight.arrival || 'ZZZZ';
-                    // Handle unknown airports
-                    if (departure === 'ZZZZ' || arrival === 'ZZZZ') {
-                        unknownFlights.push({
-                            callsign,
-                            ...flight
-                        });
-                        return;
-                    }
-                    // Create airport entries if they don't exist
-                    if (!airports[departure]) {
-                        airports[departure] = {
-                            name: departure,
-                            departures: [],
-                            arrivals: [],
-                            atc: []
-                        };
-                    }
-                    if (!airports[arrival]) {
-                        airports[arrival] = {
-                            name: arrival,
-                            departures: [],
-                            arrivals: [],
-                            atc: []
-                        };
-                    }
-                    // Add to departures
-                    airports[departure].departures.push({
+        }
+
+        // Process flight data and group by airports
+        function processFlightData(flightData) {
+            if (!flightData) return {};
+
+            const airports = {};
+            let unknownFlights = [];
+
+            // Process each flight
+            Object.entries(flightData).forEach(([callsign, flight]) => {
+                if (!flight || (flight.live === false && showLiveOnly)) return;
+
+                const departure = flight.departure || 'ZZZZ';
+                const arrival = flight.arrival || 'ZZZZ';
+
+                // Handle unknown airports
+                if (departure === 'ZZZZ' || arrival === 'ZZZZ') {
+                    unknownFlights.push({
                         callsign,
-                        ...flight,
-                        type: 'departure'
+                        ...flight
                     });
-                    // Add to arrivals
-                    airports[arrival].arrivals.push({
-                        callsign,
-                        ...flight,
-                        type: 'arrival'
-                    });
-                });
-                // Add UNKNOWN section if there are flights
-                if (unknownFlights.length > 0) {
-                    airports.UNKNOWN = {
-                        name: 'UNKNOWN',
-                        flights: unknownFlights,
+                    return;
+                }
+
+                // Create airport entries if they don't exist
+                if (!airports[departure]) {
+                    airports[departure] = {
+                        name: departure,
+                        departures: [],
+                        arrivals: [],
                         atc: []
                     };
                 }
-                return airports;
-            }
-            // Process ATC data and add to airports
-            function processAtcData(atcData, airports) {
-                if (!atcData) return airports;
-                // Add staff chat data
-                const staffChat = {
-                    name: "ATC24 Staff Chat",
-                    departures: [],
-                    arrivals: [],
+
+                if (!airports[arrival]) {
+                    airports[arrival] = {
+                        name: arrival,
+                        departures: [],
+                        arrivals: [],
+                        atc: []
+                    };
+                }
+
+                // Add to departures
+                airports[departure].departures.push({
+                    callsign,
+                    ...flight,
+                    type: 'departure'
+                });
+
+                // Add to arrivals
+                airports[arrival].arrivals.push({
+                    callsign,
+                    ...flight,
+                    type: 'arrival'
+                });
+            });
+
+            // Add UNKNOWN section if there are flights
+            if (unknownFlights.length > 0) {
+                airports.UNKNOWN = {
+                    name: 'UNKNOWN',
+                    flights: unknownFlights,
                     atc: []
                 };
-                atcData.forEach(controller => {
-                    if (!controller) return;
-                    // Skip unclaimed positions
-                    if (!controller.holder) return;
-                    const airportName = controller.airport;
-                    // Handle staff chat separately
-                    if (airportName === "ATC24 Staff Chat") {
-                        staffChat.atc.push(controller);
-                        return;
-                    }
-                    const icao = airportName;
-                    if (airports[icao]) {
-                        airports[icao].atc.push(controller);
-                    } else {
-                        // Create airport entry if it doesn't exist
-                        airports[icao] = {
-                            name: icao,
-                            departures: [],
-                            arrivals: [],
-                            atc: [controller]
-                        };
-                    }
-                });
-                // Add staff chat if it has controllers
-                if (staffChat.atc.length > 0) {
-                    airports["ATC24 Staff Chat"] = staffChat;
+            }
+
+            return airports;
+        }
+
+        // Process ATC data and add to airports
+        function processAtcData(atcData, airports) {
+            if (!atcData) return airports;
+
+            // Add staff chat data
+            const staffChat = {
+                name: "ATC24 Staff Chat",
+                departures: [],
+                arrivals: [],
+                atc: []
+            };
+
+            atcData.forEach(controller => {
+                if (!controller) return;
+
+                // Skip unclaimed positions
+                if (!controller.holder) return;
+
+                const airportName = controller.airport;
+
+                // Handle staff chat separately
+                if (airportName === "ATC24 Staff Chat") {
+                    staffChat.atc.push(controller);
+                    return;
                 }
-                return airports;
-            }
-            // Render UNKNOWN airport flights
-            function renderUnknownAirport(airport) {
-                if (!airport || !airport.flights || airport.flights.length === 0) return '';
-                return `
 
-									<div class="airport-section">
-										<div class="airport-header">
-											<div class="airport-name">UNKNOWN</div>
-											<div class="flight-counts">
-												<div class="count">${airport.flights.length} flights</div>
-											</div>
-										</div>
-										<div class="section-title">All Flights</div>
+                const icao = airportName;
+
+                if (airports[icao]) {
+                    airports[icao].atc.push(controller);
+                } else {
+                    // Create airport entry if it doesn't exist
+                    airports[icao] = {
+                        name: icao,
+                        departures: [],
+                        arrivals: [],
+                        atc: [controller]
+                    };
+                }
+            });
+
+            // Add staff chat if it has controllers
+            if (staffChat.atc.length > 0) {
+                airports["ATC24 Staff Chat"] = staffChat;
+            }
+
+            return airports;
+        }
+
+        // Render UNKNOWN airport flights
+        function renderUnknownAirport(airport) {
+            if (!airport || !airport.flights || airport.flights.length === 0) return '';
+
+            return `
+            <div class="airport-section">
+                <div class="airport-header">
+                    <div class="airport-name">UNKNOWN</div>
+                    <div class="flight-counts">
+                        <div class="count">${airport.flights.length} flights</div>
+                    </div>
+                </div>
+                
+                <div class="section-title">All Flights</div>
                 ${renderFlights(airport.flights)}
-
-									</div>
+            </div>
         `;
-            }
-            // Render ATC positions
-            function renderAtcPositions(atcData) {
-                if (!atcData || atcData.length === 0) return '';
-                return atcData.map(position => {
-                    if (!position) return '';
-                    let iconName;
-                    let positionClass = '';
-                    if (position.position === "CTR") {
-                        iconName = "center_atc.png";
-                        positionClass = "center";
-                    } else if (position.position === "TWR") {
-                        iconName = "tower_atc.png";
-                        positionClass = "tower";
-                    } else if (position.position === "GND") {
-                        iconName = "ground_atc.png";
-                        positionClass = "ground";
-                    } else {
-                        iconName = "staff_atc.png";
-                        positionClass = "staff";
-                    }
-                    return `
+        }
 
-									<div class="atc-position ${positionClass}">
-										<img src="${ICON_BASE_URL}${iconName}"
-                         alt="${position.position}"
+        // Render ATC positions
+        function renderAtcPositions(atcData) {
+            if (!atcData || atcData.length === 0) return '';
+
+            return atcData.map(position => {
+                if (!position) return '';
+
+                let iconName;
+                let positionClass = '';
+
+                if (position.position === "CTR") {
+                    iconName = "center_atc.png";
+                    positionClass = "center";
+                } else if (position.position === "TWR") {
+                    iconName = "tower_atc.png";
+                    positionClass = "tower";
+                } else if (position.position === "GND") {
+                    iconName = "ground_atc.png";
+                    positionClass = "ground";
+                } else {
+                    iconName = "staff_atc.png";
+                    positionClass = "staff";
+                }
+
+                return `
+                <div class="atc-position ${positionClass}">
+                    <img src="${ICON_BASE_URL}${iconName}" 
+                         alt="${position.position}" 
                          class="atc-icon"
                          title="${position.position}">
-											<div class="atc-info">
-												<div class="atc-holder">
+                    <div class="atc-info">
+                        <div class="atc-holder">
                             ${position.holder || "Unclaimed"}
-
-													<span class="atc-freq">${position.frequency}</span>
-												</div>
+                            <span class="atc-freq">${position.frequency}</span>
+                        </div>
                         ${position.queue && position.queue.length > 0 ? `
-
-												<div class="atc-queue">
-                                Queue:
-													<span class="queue-count">${position.queue.length}</span>
-												</div>
+                            <div class="atc-queue">
+                                Queue: <span class="queue-count">${position.queue.length}</span>
+                            </div>
                         ` : ''}
-
-											</div>
-										</div>
+                    </div>
+                </div>
             `;
-                }).join('');
-            }
-            // Render ATC24 Staff Chat
-            function renderStaffChat(airport) {
-                if (!airport || !airport.atc || airport.atc.length === 0 || !showAtc) return '';
-                return `
+            }).join('');
+        }
 
-										<div class="staff-chat">
-											<div class="staff-chat-title">ATC24 Staff Chat</div>
-											<div class="atc-container">
+        // Render ATC24 Staff Chat
+        function renderStaffChat(airport) {
+            if (!airport || !airport.atc || airport.atc.length === 0 || !showAtc) return '';
+
+            return `
+            <div class="staff-chat">
+                <div class="staff-chat-title">ATC24 Staff Chat</div>
+                <div class="atc-container">
                     ${renderAtcPositions(airport.atc)}
                 </div>
-										</div>
+            </div>
         `;
-            }
-            // Render flights list
-            function renderFlights(flights) {
-                if (!flights || flights.length === 0) {
-                    return ' < div class = "no-flights" > No flights < /div>';
-                }
-                return flights.map(flight => {
-                    if (!flight) return '';
-                    const departure = flight.departure || 'UNKNOWN';
-                    const arrival = flight.arrival || 'UNKNOWN';
-                    const fplTime = flight.fpl_created_time || "--:--";
-                    const flightLevel = flight.flight_level ? `FL${Math.floor(flight.flight_level/100)}` : 'N/A';
-                    return `
+        }
 
-										<div class="flight-card ${flight.live ? 'live' : ''}" data-live="${flight.live}">
-											<div class="flight-header">
-												<div class="flight-callsign">
-													<img src="${ICON_BASE_URL}${FLIGHT_STATES[flight.state]?.icon || 'ground.png'}"
-                                 alt="${FLIGHT_STATES[flight.state]?.name || 'Unknown'}"
+        // Render flights list
+        function renderFlights(flights) {
+            if (!flights || flights.length === 0) {
+                return '<div class="no-flights">No flights</div>';
+            }
+
+            return flights.map(flight => {
+                if (!flight) return '';
+
+                const departure = flight.departure || 'UNKNOWN';
+                const arrival = flight.arrival || 'UNKNOWN';
+                const fplTime = flight.fpl_created_time || "--:--";
+                const flightLevel = flight.flight_level ? `FL${Math.floor(flight.flight_level / 100)}` : 'N/A';
+
+                return `
+                <div class="flight-card ${flight.live ? 'live' : ''}" data-live="${flight.live}">
+                    <div class="flight-header">
+                        <div class="flight-callsign">
+                            <img src="${ICON_BASE_URL}${FLIGHT_STATES[flight.state]?.icon || 'ground.png'}" 
+                                 alt="${FLIGHT_STATES[flight.state]?.name || 'Unknown'}" 
                                  class="state-icon"
                                  title="${FLIGHT_STATES[flight.state]?.name || 'Unknown'}">
                             ${flight.cs || flight.callsign || 'UNKNOWN'}
-                            ${flight.live ? '
-														<span class="live-badge">LIVE</span>' : ''}
-
-													</div>
-													<div class="flight-aircraft">${flight.aircraft || 'UNKNOWN'}</div>
-												</div>
-												<div class="flight-details">
-													<div class="flight-fplfiled">${fplTime}</div>
-													<div class="detail-item">
-														<span class="detail-label">Player</span>
-														<span class="detail-value">${flight.player_name || 'Unknown'}</span>
-													</div>
-													<div class="detail-item">
-														<span class="detail-label">Route</span>
-														<span class="detail-value">${departure} → ${arrival}</span>
-													</div>
-												</div>
-												<div class="flight-details-expanded">
-													<div class="flight-details">
-														<div class="detail-item">
-															<span class="detail-label">Heading</span>
-															<span class="detail-value">${flight.heading || '---'}°</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">Altitude</span>
-															<span class="detail-value">${flight.altitude || '---'} ft</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">Flight Level</span>
-															<span class="detail-value">${flightLevel}</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">Speed</span>
-															<span class="detail-value">${flight.speed || '---'} kts</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">Ground Speed</span>
-															<span class="detail-value">${flight.ground_speed || '---'} kts</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">Flight Rules</span>
-															<span class="detail-value">${flight.flightrules || '---'}</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">Position</span>
-															<span class="detail-value">${flight.pos_x || '---'}, ${flight.pos_y || '---'}</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">Route</span>
-															<span class="detail-value">${flight.route || 'Unknown'}</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">In-game callsign</span>
-															<span class="detail-value">${flight.callsign || '---'}</span>
-														</div>
-														<div class="detail-item">
-															<span class="detail-label">State</span>
-															<span class="detail-value">${FLIGHT_STATES[flight.state]?.name || 'Unknown'}</span>
-														</div>
+                            ${flight.live ? '<span class="live-badge">LIVE</span>' : ''}
+                        </div>
+                        <div class="flight-aircraft">${flight.aircraft || 'UNKNOWN'}</div>
+                    </div>
+                    
+                    <div class="flight-details">
+                        <div class="flight-fplfiled">${fplTime}</div>
+                        <div class="detail-item">
+                            <span class="detail-label">Player</span>
+                            <span class="detail-value">${flight.player_name || 'Unknown'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Route</span>
+                            <span class="detail-value">${departure} → ${arrival}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flight-details-expanded">
+                        <div class="flight-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Heading</span>
+                                <span class="detail-value">${flight.heading || '---'}°</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Altitude</span>
+                                <span class="detail-value">${flight.altitude || '---'} ft</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Flight Level</span>
+                                <span class="detail-value">${flightLevel}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Speed</span>
+                                <span class="detail-value">${flight.speed || '---'} kts</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Ground Speed</span>
+                                <span class="detail-value">${flight.ground_speed || '---'} kts</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Flight Rules</span>
+                                <span class="detail-value">${flight.flightrules || '---'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Position</span>
+                                <span class="detail-value">${flight.pos_x || '---'}, ${flight.pos_y || '---'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Route</span>
+                                <span class="detail-value">${flight.route || 'Unknown'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">In-game callsign</span>
+                                <span class="detail-value">${flight.callsign || '---'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">State</span>
+                                <span class="detail-value">${FLIGHT_STATES[flight.state]?.name || 'Unknown'}</span>
+                            </div>
                             ${flight.wind ? `
-
-														<div class="detail-item">
-															<span class="detail-label">Wind</span>
-															<span class="detail-value">${flight.wind}</span>
-														</div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Wind</span>
+                                    <span class="detail-value">${flight.wind}</span>
+                                </div>
                             ` : ''}
-
-													</div>
-												</div>
-											</div>
+                        </div>
+                    </div>
+                </div>
             `;
-                }).join('');
+            }).join('');
+        }
+
+        function getTimeClass(time, type) {
+            if (!time) return '';
+
+            if (type === 'taxi') {
+                if (time <= 5) return 'time-green';
+                if (time <= 7) return 'time-orange';
+                return 'time-red';
+            } else { // obt
+                if (time <= 10) return 'time-green';
+                if (time <= 15) return 'time-orange';
+                return 'time-red';
+            }
+        }
+
+        // Render airports and flights
+        async function renderAirports(airports, airportStats = {}) {
+            if (!airports || Object.keys(airports).length === 0) {
+                airportsContainer.innerHTML = '<div class="no-flights">No flight data available</div>';
+                return;
             }
 
-            function getTimeClass(time, type) {
-                if (!time) return '';
-                if (type === 'taxi') {
-                    if (time <= 5) return 'time-green';
-                    if (time <= 7) return 'time-orange';
-                    return 'time-red';
-                } else { // obt
-                    if (time <= 10) return 'time-green';
-                    if (time <= 15) return 'time-orange';
-                    return 'time-red';
-                }
-            }
-            // Render airports and flights
-            async function renderAirports(airports, airportStats = {}) {
-                if (!airports || Object.keys(airports).length === 0) {
-                    airportsContainer.innerHTML = ' < div class = "no-flights" > No flight data available < /div>';
-                    return;
-                }
-                let html = '';
-                let staffChatHtml = '';
-                let unknownAirportHtml = '';
-                // Sort airports by flight count
-                const sortedAirports = Object.entries(airports).sort((a, b) => {
-                    // ATC24 Staff Chat should be last
-                    if (a[0] === "ATC24 Staff Chat") return 1;
-                    if (b[0] === "ATC24 Staff Chat") return -1;
-                    // UNKNOWN should be before Staff Chat but after others
-                    if (a[0] === "UNKNOWN") return 1;
-                    if (b[0] === "UNKNOWN") return -1;
-                    // Calculate total flights for each airport
-                    const aFlights = (a[1].departures?.length || 0) + (a[1].arrivals?.length || 0);
-                    const bFlights = (b[1].departures?.length || 0) + (b[1].arrivals?.length || 0);
-                    return bFlights - aFlights;
-                });
-                for (const [icao, airport] of sortedAirports) {
-                    if (!airport) continue;
-                    const depCount = airport.departures?.length || 0;
-                    const arrCount = airport.arrivals?.length || 0;
-                    const atcCount = airport.atc?.length || 0;
-                    // Skip empty airports
-                    if (depCount === 0 && arrCount === 0 && atcCount === 0) continue;
-                    // Special handling for ATC24 Staff Chat and UNKNOWN
-                    if (icao === "ATC24 Staff Chat") {
-                        staffChatHtml = renderStaffChat(airport);
-                        continue;
-                    }
-                    if (icao === "UNKNOWN") {
-                        unknownAirportHtml = renderUnknownAirport(airport);
-                        continue;
-                    }
-                    // Get airport stats
-                    const stats = airportStats[icao] || {};
-                    const avgTaxiTime = stats.taxi_times?.length > 0 ? (stats.taxi_times.reduce((a, b) => a + b, 0) / stats.taxi_times.length) : null;
-                    const avgObtTime = stats.obt_times?.length > 0 ? (stats.obt_times.reduce((a, b) => a + b, 0) / stats.obt_times.length) : null;
-                    const airportHtml = `
+            let html = '';
+            let staffChatHtml = '';
+            let unknownAirportHtml = '';
 
-											<div class="airport-section">
-												<div class="airport-header">
-													<div class="airport-name">${icao}</div>
-													<div class="flight-counts">
-                            ${depCount > 0 ? `
-														<div class="count departure-count">${depCount}↑</div>` : ''}
-                            ${arrCount > 0 ? `
-														<div class="count arrival-count">${arrCount}↓</div>` : ''}
+            // Sort airports by flight count
+            const sortedAirports = Object.entries(airports).sort((a, b) => {
+                // ATC24 Staff Chat should be last
+                if (a[0] === "ATC24 Staff Chat") return 1;
+                if (b[0] === "ATC24 Staff Chat") return -1;
+
+                // UNKNOWN should be before Staff Chat but after others
+                if (a[0] === "UNKNOWN") return 1;
+                if (b[0] === "UNKNOWN") return -1;
+
+                // Calculate total flights for each airport
+                const aFlights = (a[1].departures?.length || 0) + (a[1].arrivals?.length || 0);
+                const bFlights = (b[1].departures?.length || 0) + (b[1].arrivals?.length || 0);
+
+                return bFlights - aFlights;
+            });
+
+            for (const [icao, airport] of sortedAirports) {
+                if (!airport) continue;
+
+                const depCount = airport.departures?.length || 0;
+                const arrCount = airport.arrivals?.length || 0;
+                const atcCount = airport.atc?.length || 0;
+
+                // Skip empty airports
+                if (depCount === 0 && arrCount === 0 && atcCount === 0) continue;
+
+                // Special handling for ATC24 Staff Chat and UNKNOWN
+                if (icao === "ATC24 Staff Chat") {
+                    staffChatHtml = renderStaffChat(airport);
+                    continue;
+                }
+
+                if (icao === "UNKNOWN") {
+                    unknownAirportHtml = renderUnknownAirport(airport);
+                    continue;
+                }
+
+                // Get airport stats
+                const stats = airportStats[icao] || {};
+                const avgTaxiTime = stats.taxi_times?.length > 0
+                    ? (stats.taxi_times.reduce((a, b) => a + b, 0) / stats.taxi_times.length)
+                    : null;
+
+                const avgObtTime = stats.obt_times?.length > 0
+                    ? (stats.obt_times.reduce((a, b) => a + b, 0) / stats.obt_times.length)
+                    : null;
+
+                const airportHtml = `
+                <div class="airport-section">
+                    <div class="airport-header">
+                        <div class="airport-name">${icao}</div>
+                        <div class="flight-counts">
+                            ${depCount > 0 ? `<div class="count departure-count">${depCount}↑</div>` : ''}
+                            ${arrCount > 0 ? `<div class="count arrival-count">${arrCount}↓</div>` : ''}
                             ${avgTaxiTime !== null ? `
-
-														<div class="count ${getTimeClass(avgTaxiTime, 'taxi')}"
+                                <div class="count ${getTimeClass(avgTaxiTime, 'taxi')}" 
                                      title="Average Taxi Time (${stats.taxi_times.length} flights)">
                                     ${avgTaxiTime.toFixed(1)}m
                                 </div>
                             ` : ''}
                             ${avgObtTime !== null ? `
-
-														<div class="count ${getTimeClass(avgObtTime, 'obt')}"
+                                <div class="count ${getTimeClass(avgObtTime, 'obt')}" 
                                      title="Average Off-Block Time (${stats.obt_times.length} flights)">
                                     ${avgObtTime.toFixed(1)}m
                                 </div>
                             ` : ''}
-
-													</div>
-												</div>
-
+                        </div>
+                    </div>
+                    
                     ${showAtc && atcCount > 0 ? `
-
-												<div class="atc-container" id="atc-${icao}">
+                        <div class="atc-container" id="atc-${icao}">
                             ${renderAtcPositions(airport.atc)}
                         </div>
                     ` : ''}
-
+                    
                     ${depCount > 0 ? `
-
-												<div class="section-title">Departures</div>
+                        <div class="section-title">Departures</div>
                         ${renderFlights(airport.departures)}
                     ` : ''}
-
+                    
                     ${arrCount > 0 ? `
-
-												<div class="section-title">Arrivals</div>
+                        <div class="section-title">Arrivals</div>
                         ${renderFlights(airport.arrivals)}
                     ` : ''}
-
-											</div>
+                </div>
             `;
-                    html += airportHtml;
-                }
-                // Combine all sections
-                html += staffChatHtml + unknownAirportHtml;
-                airportsContainer.innerHTML = html || ' < div class = "no-flights" > No flights match current filters < /div>';
-                // Add click handlers for flight cards
-                document.querySelectorAll('.flight-card').forEach(card => {
-                    card.addEventListener('click', function() {
-                        const details = this.querySelector('.flight-details-expanded');
-                        if (details) {
-                            details.style.display = details.style.display === 'block' ? 'none' : 'block';
-                        }
-                    });
+
+                html += airportHtml;
+            }
+
+            // Combine all sections
+            html += staffChatHtml + unknownAirportHtml;
+
+            airportsContainer.innerHTML = html || '<div class="no-flights">No flights match current filters</div>';
+
+            // Add click handlers for flight cards
+            document.querySelectorAll('.flight-card').forEach(card => {
+                card.addEventListener('click', function () {
+                    const details = this.querySelector('.flight-details-expanded');
+                    if (details) {
+                        details.style.display = details.style.display === 'block' ? 'none' : 'block';
+                    }
                 });
-            }
-            // Update weather info
-            function updateWeatherInfo(flightData) {
-                const weatherInfo = document.getElementById('weatherInfo');
-                if (!weatherInfo) return;
-                if (!flightData || Object.keys(flightData).length === 0) {
-                    weatherInfo.innerHTML = `
+            });
+        }
 
-											<img src="${ICON_BASE_URL}weather.png" alt="Weather" class="weather-icon">
-												<span class="weather-hint">Wind:</span>
-												<span class="weather-value">no data</span>
-            `;
-                    return;
-                }
-                // Find first flight with wind data
-                let windValue = 'no data';
-                for (const flight of Object.values(flightData)) {
-                    if (flight?.wind) {
-                        windValue = flight.wind;
-                        break;
-                    }
-                }
+        // Update weather info
+        function updateWeatherInfo(flightData) {
+            const weatherInfo = document.getElementById('weatherInfo');
+            if (!weatherInfo) return;
+
+            if (!flightData || Object.keys(flightData).length === 0) {
                 weatherInfo.innerHTML = `
+                <img src="${ICON_BASE_URL}weather.png" alt="Weather" class="weather-icon">
+                <span class="weather-hint">Wind:</span>
+                <span class="weather-value">no data</span>
+            `;
+                return;
+            }
 
-												<img src="${ICON_BASE_URL}weather.png" alt="Weather" class="weather-icon">
-													<span class="weather-hint">Wind</span>
-													<span class="weather-value">${windValue}</span>
+            // Find first flight with wind data
+            let windValue = 'no data';
+            for (const flight of Object.values(flightData)) {
+                if (flight?.wind) {
+                    windValue = flight.wind;
+                    break;
+                }
+            }
+
+            weatherInfo.innerHTML = `
+            <img src="${ICON_BASE_URL}weather.png" alt="Weather" class="weather-icon">
+            <span class="weather-hint">Wind</span>
+            <span class="weather-value">${windValue}</span>
         `;
-            }
-            // Refresh all data
-            async function refreshData() {
-                if (!airportsContainer) return;
-                airportsContainer.innerHTML = ' < div class = "loading" > Loading data... < /div>';
-                try {
-                    const [flightData, atcData, airportStats] = await Promise.all([
-                        fetchFlightData(),
-                        showAtc ? fetchAtcData() : Promise.resolve(null),
-                        fetch(AIRPORT_STATS_API_URL).then(res => res.json()).catch(() => ({}))
-                    ]);
-                    if (flightData) {
-                        updateWeatherInfo(flightData);
-                        let processedData = processFlightData(flightData);
-                        if (showAtc && atcData) {
-                            processedData = processAtcData(atcData, processedData);
-                        }
-                        renderAirports(processedData, airportStats || {});
-                    } else {
-                        airportsContainer.innerHTML = ' < div class = "no-flights" > Failed to load flight data < /div>';
+        }
+
+        // Refresh all data
+        async function refreshData() {
+            if (!airportsContainer) return;
+
+            airportsContainer.innerHTML = '<div class="loading">Loading data...</div>';
+
+            try {
+                const [flightData, atcData, airportStats] = await Promise.all([
+                    fetchFlightData(),
+                    showAtc ? fetchAtcData() : Promise.resolve(null),
+                    fetch(AIRPORT_STATS_API_URL).then(res => res.json()).catch(() => ({}))
+                ]);
+
+                if (flightData) {
+                    updateWeatherInfo(flightData);
+                    let processedData = processFlightData(flightData);
+                    if (showAtc && atcData) {
+                        processedData = processAtcData(atcData, processedData);
                     }
-                } catch (error) {
-                    console.error('Error refreshing data:', error);
-                    airportsContainer.innerHTML = ' < div class = "no-flights" > Failed to load data < /div>';
+                    renderAirports(processedData, airportStats || {});
+                } else {
+                    airportsContainer.innerHTML = '<div class="no-flights">Failed to load flight data</div>';
                 }
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                airportsContainer.innerHTML = '<div class="no-flights">Failed to load data</div>';
             }
-            // Start auto refresh
-            function startAutoRefresh() {
-                if (autoRefreshInterval) {
-                    clearInterval(autoRefreshInterval);
-                }
-                autoRefreshInterval = setInterval(refreshData, REFRESH_INTERVAL);
+        }
+
+        // Start auto refresh
+        function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
             }
-            // Stop auto refresh
-            function stopAutoRefresh() {
-                if (autoRefreshInterval) {
-                    clearInterval(autoRefreshInterval);
-                    autoRefreshInterval = null;
-                }
+            autoRefreshInterval = setInterval(refreshData, REFRESH_INTERVAL);
+        }
+
+        // Stop auto refresh
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
             }
-            // Initialize the app
-            function init() {
-                if (!toggleLiveBtn || !toggleRefreshBtn || !toggleAtcBtn) return;
-                // Load settings
-                showLiveOnly = localStorage.getItem('showLiveOnly') === 'true';
-                showAtc = localStorage.getItem('showAtc') === 'true';
-                autoRefreshEnabled = localStorage.getItem('autoRefreshEnabled') === 'true';
-                // Set initial switch states
-                toggleLiveBtn.checked = showLiveOnly;
-                toggleRefreshBtn.checked = autoRefreshEnabled;
-                toggleAtcBtn.checked = showAtc;
+        }
+
+        // Initialize the app
+        function init() {
+            if (!toggleLiveBtn || !toggleRefreshBtn || !toggleAtcBtn) return;
+
+            // Load settings
+            showLiveOnly = localStorage.getItem('showLiveOnly') === 'true';
+            showAtc = localStorage.getItem('showAtc') === 'true';
+            autoRefreshEnabled = localStorage.getItem('autoRefreshEnabled') === 'true';
+
+            // Set initial switch states
+            toggleLiveBtn.checked = showLiveOnly;
+            toggleRefreshBtn.checked = autoRefreshEnabled;
+            toggleAtcBtn.checked = showAtc;
+
+            if (autoRefreshEnabled) {
+                startAutoRefresh();
+            }
+
+            // Load initial data
+            refreshData();
+        }
+
+        // Event listeners
+        if (toggleLiveBtn) {
+            toggleLiveBtn.addEventListener('change', function () {
+                showLiveOnly = this.checked;
+                localStorage.setItem('showLiveOnly', showLiveOnly);
+                refreshData();
+            });
+        }
+
+        if (toggleAtcBtn) {
+            toggleAtcBtn.addEventListener('change', function () {
+                showAtc = this.checked;
+                localStorage.setItem('showAtc', showAtc);
+                refreshData();
+            });
+        }
+
+        if (toggleRefreshBtn) {
+            toggleRefreshBtn.addEventListener('change', function () {
+                autoRefreshEnabled = this.checked;
+                localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
+
                 if (autoRefreshEnabled) {
                     startAutoRefresh();
+                } else {
+                    stopAutoRefresh();
                 }
-                // Load initial data
-                refreshData();
-            }
-            // Event listeners
-            if (toggleLiveBtn) {
-                toggleLiveBtn.addEventListener('change', function() {
-                    showLiveOnly = this.checked;
-                    localStorage.setItem('showLiveOnly', showLiveOnly);
-                    refreshData();
-                });
-            }
-            if (toggleAtcBtn) {
-                toggleAtcBtn.addEventListener('change', function() {
-                    showAtc = this.checked;
-                    localStorage.setItem('showAtc', showAtc);
-                    refreshData();
-                });
-            }
-            if (toggleRefreshBtn) {
-                toggleRefreshBtn.addEventListener('change', function() {
-                    autoRefreshEnabled = this.checked;
-                    localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
-                    if (autoRefreshEnabled) {
-                        startAutoRefresh();
-                    } else {
-                        stopAutoRefresh();
-                    }
-                });
-            }
-            // Start the app when DOM is loaded
-            document.addEventListener('DOMContentLoaded', init);
-        </script>
-    </body>
+            });
+        }
+
+        // Start the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
 </html>
