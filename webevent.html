@@ -449,12 +449,35 @@
         .weather-value {
             font-weight: 500;
         }
+
+	.partnered_with {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #2a2a2a;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+	.partner_a {
+	    font-weight: 500;
+	    color: #fff;
+	}
     </style>
 </head>
 
 <body>
     <div class="container">
         <h1>24schedule</h1>
+
+    <div class="partnered_with">
+<img src="https://raw.githubusercontent.com/deepslatetile/24schedule/main/handshake.png" alt=""
+                class="weather-icon">
+        <span class="partnersmol">Partnered with</span>
+        <a class="partner_a" href="https://discord.gg/ee63zyzrJh" class="partnerbig">ATC24Academy</a>
+    </div>
+
         <div class="filters">
             <div class="filter-switch">
                 <span class="filter-label">Show LIVE only</span>
