@@ -501,478 +501,496 @@
         </div>
     </div>
 
-    <script>
-        // Configuration
-        const FLIGHTS_API_URL = 'https://two4schedule.onrender.com/api/v1/edsr';
-        const ATC_API_URL = '';
-        const ICON_BASE_URL = 'https://raw.githubusercontent.com/deepslatetile/24schedule/main/';
-        const AIRPORT_STATS_API_URL = '';
-        const REFRESH_INTERVAL = 5000;
 
-        // Flight states
-        const FLIGHT_STATES = {
-            0: { "name": "Boarding", "icon": "boarding.png" },
-            1: { "name": "Taxiing", "icon": "taxiing.png" },
-            2: { "name": "Climbing", "icon": "departure.png" },
-            3: { "name": "Cruising", "icon": "cruise.png" },
-            4: { "name": "Descending", "icon": "arrival.png" },
-            5: { "name": "Arrived", "icon": "ground.png" },
-            6: { "name": "Training", "icon": "training.png" }
-        };
+<script>
+    // Configuration
+    const FLIGHTS_API_URL = 'https://two4schedule.onrender.com/api/v1/edsr';
+    const ATC_API_URL = '';
+    const ICON_BASE_URL = 'https://raw.githubusercontent.com/deepslatetile/24schedule/main/';
+    const AIRPORT_STATS_API_URL = '';
+    const REFRESH_INTERVAL = 5000;
 
-        // State
-        let showLiveOnly = false;
-        let showAtc = false;
-        let autoRefreshEnabled = false;
-        let autoRefreshInterval = null;
+    // Flight states
+    const FLIGHT_STATES = {
+        0: { "name": "Boarding", "icon": "boarding.png" },
+        1: { "name": "Taxiing", "icon": "taxiing.png" },
+        2: { "name": "Climbing", "icon": "departure.png" },
+        3: { "name": "Cruising", "icon": "cruise.png" },
+        4: { "name": "Descending", "icon": "arrival.png" },
+        5: { "name": "Arrived", "icon": "ground.png" },
+        6: { "name": "Training", "icon": "training.png" }
+    };
 
-        // DOM Elements
-        const airportsContainer = document.getElementById('airportsContainer');
-        const toggleLiveBtn = document.getElementById('toggleLive');
-        const toggleRefreshBtn = document.getElementById('toggleRefresh');
+    // State
+    let showLiveOnly = false;
+    let showAtc = false;
+    let autoRefreshEnabled = false;
+    let autoRefreshInterval = null;
 
-        // Fetch flight data from API
-        async function fetchFlightData() {
-            try {
-                const response = await fetch(FLIGHTS_API_URL);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch flight data');
-                }
-                return await response.json();
-            } catch (error) {
-                console.error('Error fetching flight data:', error);
-                return null;
+    // DOM Elements
+    const airportsContainer = document.getElementById('airportsContainer');
+    const toggleLiveBtn = document.getElementById('toggleLive');
+    const toggleRefreshBtn = document.getElementById('toggleRefresh');
+
+    // Fetch flight data from API
+    async function fetchFlightData() {
+        try {
+            const response = await fetch(FLIGHTS_API_URL);
+            if (!response.ok) {
+                throw new Error('Failed to fetch flight data');
             }
-        }
-
-        // Fetch ATC data from API
-        async function fetchAtcData() {
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching flight data:', error);
             return null;
         }
+    }
 
-        // Process flight data and group by airports
-        function processFlightData(flightData) {
-            if (!flightData) return {};
+    // Fetch ATC data from API
+    async function fetchAtcData() {
+        return null;
+    }
 
-            const airports = {};
-            let unknownFlights = [];
+    // Process flight data and group by airports
+    function processFlightData(flightData) {
+        if (!flightData) return {};
 
-            // Process each flight
-            Object.entries(flightData).forEach(([callsign, flight]) => {
-                if (!flight || (flight.live === false && showLiveOnly)) return;
+        const airports = {};
+        let unknownFlights = [];
 
-                const departure = flight.departure || 'ZZZZ';
-                const arrival = flight.arrival || 'ZZZZ';
+        // Process each flight
+        Object.entries(flightData).forEach(([callsign, flight]) => {
+            if (!flight || (flight.live === false && showLiveOnly)) return;
 
-                // Handle unknown airports
-                if (departure === 'ZZZZ' || arrival === 'ZZZZ') {
-                    unknownFlights.push({
-                        callsign,
-                        ...flight
-                    });
-                    return;
-                }
+            const departure = flight.departure || 'ZZZZ';
+            const arrival = flight.arrival || 'ZZZZ';
 
-                // Create airport entries if they don't exist
-                if (!airports[departure]) {
-                    airports[departure] = {
-                        name: departure,
-                        departures: [],
-                        arrivals: [],
-                        atc: []
-                    };
-                }
-
-                if (!airports[arrival]) {
-                    airports[arrival] = {
-                        name: arrival,
-                        departures: [],
-                        arrivals: [],
-                        atc: []
-                    };
-                }
-
-                // Add to departures
-                airports[departure].departures.push({
+            // Handle unknown airports
+            if (departure === 'ZZZZ' || arrival === 'ZZZZ') {
+                unknownFlights.push({
                     callsign,
-                    ...flight,
-                    type: 'departure'
+                    ...flight
                 });
+                return;
+            }
 
-                // Add to arrivals
-                airports[arrival].arrivals.push({
-                    callsign,
-                    ...flight,
-                    type: 'arrival'
-                });
-            });
-
-            // Add UNKNOWN section if there are flights
-            if (unknownFlights.length > 0) {
-                airports.UNKNOWN = {
-                    name: 'UNKNOWN',
-                    flights: unknownFlights,
+            // Create airport entries if they don't exist
+            if (!airports[departure]) {
+                airports[departure] = {
+                    name: departure,
+                    departures: [],
+                    arrivals: [],
                     atc: []
                 };
             }
 
-            return airports;
-        }
+            if (!airports[arrival]) {
+                airports[arrival] = {
+                    name: arrival,
+                    departures: [],
+                    arrivals: [],
+                    atc: []
+                };
+            }
 
-        // Process ATC data and add to airports
-        function processAtcData(atcData, airports) {
-            if (!atcData) return airports;
+            // Add to departures
+            airports[departure].departures.push({
+                callsign,
+                ...flight,
+                type: 'departure'
+            });
 
-            // Add staff chat data
-            const staffChat = {
-                name: "ATC24 Staff Chat",
-                departures: [],
+            // Add to arrivals
+            airports[arrival].arrivals.push({
+                callsign,
+                ...flight,
+                type: 'arrival'
+            });
+        });
+
+        // Add UNKNOWN section if there are flights
+        if (unknownFlights.length > 0) {
+            airports.UNKNOWN = {
+                name: 'UNKNOWN',
+                flights: unknownFlights,
+                departures: unknownFlights,
                 arrivals: [],
                 atc: []
             };
-
-            atcData.forEach(controller => {
-                if (!controller) return;
-
-                // Skip unclaimed positions
-                if (!controller.holder) return;
-
-                const airportName = controller.airport;
-
-                // Handle staff chat separately
-                if (airportName === "ATC24 Staff Chat") {
-                    staffChat.atc.push(controller);
-                    return;
-                }
-
-                const icao = airportName;
-
-                if (airports[icao]) {
-                    airports[icao].atc.push(controller);
-                } else {
-                    // Create airport entry if it doesn't exist
-                    airports[icao] = {
-                        name: icao,
-                        departures: [],
-                        arrivals: [],
-                        atc: [controller]
-                    };
-                }
-            });
-
-            // Add staff chat if it has controllers
-            if (staffChat.atc.length > 0) {
-                airports["ATC24 Staff Chat"] = staffChat;
-            }
-
-            return airports;
         }
 
-        // Render UNKNOWN airport flights
-        function renderUnknownAirport(airport) {
-            if (!airport || !airport.flights || airport.flights.length === 0) return '';
+        return airports;
+    }
+
+    // Process ATC data and add to airports
+    function processAtcData(atcData, airports) {
+        if (!atcData) return airports;
+
+        // Add staff chat data
+        const staffChat = {
+            name: "ATC24 Staff Chat",
+            departures: [],
+            arrivals: [],
+            atc: []
+        };
+
+        atcData.forEach(controller => {
+            if (!controller) return;
+
+            // Skip unclaimed positions
+            if (!controller.holder) return;
+
+            const airportName = controller.airport;
+
+            // Handle staff chat separately
+            if (airportName === "ATC24 Staff Chat") {
+                staffChat.atc.push(controller);
+                return;
+            }
+
+            const icao = airportName;
+
+            if (airports[icao]) {
+                airports[icao].atc.push(controller);
+            } else {
+                // Create airport entry if it doesn't exist
+                airports[icao] = {
+                    name: icao,
+                    departures: [],
+                    arrivals: [],
+                    atc: [controller]
+                };
+            }
+        });
+
+        // Add staff chat if it has controllers
+        if (staffChat.atc.length > 0) {
+            airports["ATC24 Staff Chat"] = staffChat;
+        }
+
+        return airports;
+    }
+
+    // Render UNKNOWN airport flights
+    function renderUnknownAirport(airport) {
+        if (!airport || (!airport.flights && !airport.departures && !airport.arrivals)) return '';
+
+        // Собираем все рейсы из разных возможных мест
+        const allFlights = [];
+        if (airport.flights) {
+            allFlights.push(...airport.flights);
+        }
+        if (airport.departures) {
+            allFlights.push(...airport.departures);
+        }
+        if (airport.arrivals) {
+            allFlights.push(...airport.arrivals);
+        }
+
+        if (allFlights.length === 0) return '';
+
+        return `
+        <div class="airport-section">
+            <div class="airport-header">
+                <div class="airport-name">UNKNOWN</div>
+                <div class="flight-counts">
+                    <div class="count">${allFlights.length} flights</div>
+                </div>
+            </div>
+            
+            <div class="section-title">All Flights</div>
+            ${renderFlights(allFlights)}
+        </div>
+    `;
+    }
+
+    // Render ATC positions
+    function renderAtcPositions(atcData) {
+        if (!atcData || atcData.length === 0) return '';
+
+        return atcData.map(position => {
+            if (!position) return '';
+
+            let iconName;
+            let positionClass = '';
+
+            if (position.position === "CTR") {
+                iconName = "center_atc.png";
+                positionClass = "center";
+            } else if (position.position === "TWR") {
+                iconName = "tower_atc.png";
+                positionClass = "tower";
+            } else if (position.position === "GND") {
+                iconName = "ground_atc.png";
+                positionClass = "ground";
+            } else {
+                iconName = "staff_atc.png";
+                positionClass = "staff";
+            }
 
             return `
-            <div class="airport-section">
-                <div class="airport-header">
-                    <div class="airport-name">UNKNOWN</div>
-                    <div class="flight-counts">
-                        <div class="count">${airport.flights.length} flights</div>
+            <div class="atc-position ${positionClass}">
+                <img src="${ICON_BASE_URL}${iconName}" 
+                     alt="${position.position}" 
+                     class="atc-icon"
+                     title="${position.position}">
+                <div class="atc-info">
+                    <div class="atc-holder">
+                        ${position.holder || "Unclaimed"}
+                        <span class="atc-freq">${position.frequency}</span>
+                    </div>
+                    ${position.queue && position.queue.length > 0 ? `
+                        <div class="atc-queue">
+                            Queue: <span class="queue-count">${position.queue.length}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        }).join('');
+    }
+
+    // Render ATC24 Staff Chat
+    function renderStaffChat(airport) {
+        if (!airport || !airport.atc || airport.atc.length === 0 || !showAtc) return '';
+
+        return `
+        <div class="staff-chat">
+            <div class="staff-chat-title">ATC24 Staff Chat</div>
+            <div class="atc-container">
+                ${renderAtcPositions(airport.atc)}
+            </div>
+        </div>
+    `;
+    }
+
+    // Render flights list
+    function renderFlights(flights) {
+        if (!flights || flights.length === 0) {
+            return '<div class="no-flights">No flights</div>';
+        }
+
+        return flights.map(flight => {
+            if (!flight) return '';
+
+            const departure = flight.departure || 'UNKNOWN';
+            const arrival = flight.arrival || 'UNKNOWN';
+            const fplTime = flight.fpl_created_time || "--:--";
+            const flightLevel = flight.flight_level ? `FL${Math.floor(flight.flight_level / 100)}` : 'N/A';
+
+            return `
+            <div class="flight-card ${flight.live ? 'live' : ''}" data-live="${flight.live}">
+                <div class="flight-header">
+                    <div class="flight-callsign">
+                        <img src="${ICON_BASE_URL}${FLIGHT_STATES[flight.state]?.icon || 'ground.png'}" 
+                             alt="${FLIGHT_STATES[flight.state]?.name || 'Unknown'}" 
+                             class="state-icon"
+                             title="${FLIGHT_STATES[flight.state]?.name || 'Unknown'}">
+                        ${flight.cs || flight.callsign || 'UNKNOWN'}
+                        ${flight.live ? '<span class="live-badge">LIVE</span>' : ''}
+                    </div>
+                    <div class="flight-aircraft">${flight.aircraft || 'UNKNOWN'}</div>
+                </div>
+                
+                <div class="flight-details">
+                    <div class="flight-fplfiled">${fplTime}</div>
+                    <div class="detail-item">
+                        <span class="detail-label">Player</span>
+                        <span class="detail-value">${flight.player_name || 'Unknown'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Route</span>
+                        <span class="detail-value">${departure} → ${arrival}</span>
                     </div>
                 </div>
                 
-                <div class="section-title">All Flights</div>
-                ${renderFlights(airport.flights)}
-            </div>
-        `;
-        }
-
-        // Render ATC positions
-        function renderAtcPositions(atcData) {
-            if (!atcData || atcData.length === 0) return '';
-
-            return atcData.map(position => {
-                if (!position) return '';
-
-                let iconName;
-                let positionClass = '';
-
-                if (position.position === "CTR") {
-                    iconName = "center_atc.png";
-                    positionClass = "center";
-                } else if (position.position === "TWR") {
-                    iconName = "tower_atc.png";
-                    positionClass = "tower";
-                } else if (position.position === "GND") {
-                    iconName = "ground_atc.png";
-                    positionClass = "ground";
-                } else {
-                    iconName = "staff_atc.png";
-                    positionClass = "staff";
-                }
-
-                return `
-                <div class="atc-position ${positionClass}">
-                    <img src="${ICON_BASE_URL}${iconName}" 
-                         alt="${position.position}" 
-                         class="atc-icon"
-                         title="${position.position}">
-                    <div class="atc-info">
-                        <div class="atc-holder">
-                            ${position.holder || "Unclaimed"}
-                            <span class="atc-freq">${position.frequency}</span>
+                <div class="flight-details-expanded">
+                    <div class="flight-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Heading</span>
+                            <span class="detail-value">${flight.heading || '---'}°</span>
                         </div>
-                        ${position.queue && position.queue.length > 0 ? `
-                            <div class="atc-queue">
-                                Queue: <span class="queue-count">${position.queue.length}</span>
+                        <div class="detail-item">
+                            <span class="detail-label">Altitude</span>
+                            <span class="detail-value">${flight.altitude || '---'} ft</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Flight Level</span>
+                            <span class="detail-value">${flightLevel}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Speed</span>
+                            <span class="detail-value">${flight.speed || '---'} kts</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Ground Speed</span>
+                            <span class="detail-value">${flight.ground_speed || '---'} kts</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Flight Rules</span>
+                            <span class="detail-value">${flight.flightrules || '---'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Position</span>
+                            <span class="detail-value">${flight.pos_x || '---'}, ${flight.pos_y || '---'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Route</span>
+                            <span class="detail-value">${flight.route || 'Unknown'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">In-game callsign</span>
+                            <span class="detail-value">${flight.callsign || '---'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">State</span>
+                            <span class="detail-value">${FLIGHT_STATES[flight.state]?.name || 'Unknown'}</span>
+                        </div>
+                        ${flight.wind ? `
+                            <div class="detail-item">
+                                <span class="detail-label">Wind</span>
+                                <span class="detail-value">${flight.wind}</span>
                             </div>
                         ` : ''}
                     </div>
                 </div>
-            `;
-            }).join('');
-        }
-
-        // Render ATC24 Staff Chat
-        function renderStaffChat(airport) {
-            if (!airport || !airport.atc || airport.atc.length === 0 || !showAtc) return '';
-
-            return `
-            <div class="staff-chat">
-                <div class="staff-chat-title">ATC24 Staff Chat</div>
-                <div class="atc-container">
-                    ${renderAtcPositions(airport.atc)}
-                </div>
             </div>
         `;
+        }).join('');
+    }
+
+    function getTimeClass(time, type) {
+        if (!time) return '';
+
+        if (type === 'taxi') {
+            if (time <= 5) return 'time-green';
+            if (time <= 7) return 'time-orange';
+            return 'time-red';
+        } else { // obt
+            if (time <= 10) return 'time-green';
+            if (time <= 15) return 'time-orange';
+            return 'time-red';
+        }
+    }
+
+    // Render airports and flights
+    async function renderAirports(airports, airportStats = {}) {
+        if (!airports || Object.keys(airports).length === 0) {
+            airportsContainer.innerHTML = '<div class="no-flights">No flight data available</div>';
+            return;
         }
 
-        // Render flights list
-        function renderFlights(flights) {
-            if (!flights || flights.length === 0) {
-                return '<div class="no-flights">No flights</div>';
+        let html = '';
+        let staffChatHtml = '';
+        let unknownAirportHtml = '';
+
+        // Sort airports by flight count
+        const sortedAirports = Object.entries(airports).sort((a, b) => {
+            // ATC24 Staff Chat should be last
+            if (a[0] === "ATC24 Staff Chat") return 1;
+            if (b[0] === "ATC24 Staff Chat") return -1;
+
+            // UNKNOWN should be before Staff Chat but after others
+            if (a[0] === "UNKNOWN") return 1;
+            if (b[0] === "UNKNOWN") return -1;
+
+            // Calculate total flights for each airport
+            const aFlights = (a[1].departures?.length || 0) + (a[1].arrivals?.length || 0);
+            const bFlights = (b[1].departures?.length || 0) + (b[1].arrivals?.length || 0);
+
+            return bFlights - aFlights;
+        });
+
+        for (const [icao, airport] of sortedAirports) {
+            if (!airport) continue;
+
+            const depCount = airport.departures?.length || 0;
+            const arrCount = airport.arrivals?.length || 0;
+            const atcCount = airport.atc?.length || 0;
+
+            // Skip empty airports
+            if (depCount === 0 && arrCount === 0 && atcCount === 0) continue;
+
+            // Special handling for ATC24 Staff Chat and UNKNOWN
+            if (icao === "ATC24 Staff Chat") {
+                staffChatHtml = renderStaffChat(airport);
+                continue;
             }
 
-            return flights.map(flight => {
-                if (!flight) return '';
+            if (icao === "UNKNOWN") {
+                unknownAirportHtml = renderUnknownAirport(airport);
+                continue;
+            }
 
-                const departure = flight.departure || 'UNKNOWN';
-                const arrival = flight.arrival || 'UNKNOWN';
-                const fplTime = flight.fpl_created_time || "--:--";
-                const flightLevel = flight.flight_level ? `FL${Math.floor(flight.flight_level / 100)}` : 'N/A';
+            // Get airport stats
+            const stats = airportStats[icao] || {};
+            const avgTaxiTime = stats.taxi_times?.length > 0
+                ? (stats.taxi_times.reduce((a, b) => a + b, 0) / stats.taxi_times.length)
+                : null;
 
-                return `
-                <div class="flight-card ${flight.live ? 'live' : ''}" data-live="${flight.live}">
-                    <div class="flight-header">
-                        <div class="flight-callsign">
-                            <img src="${ICON_BASE_URL}${FLIGHT_STATES[flight.state]?.icon || 'ground.png'}" 
-                                 alt="${FLIGHT_STATES[flight.state]?.name || 'Unknown'}" 
-                                 class="state-icon"
-                                 title="${FLIGHT_STATES[flight.state]?.name || 'Unknown'}">
-                            ${flight.cs || flight.callsign || 'UNKNOWN'}
-                            ${flight.live ? '<span class="live-badge">LIVE</span>' : ''}
-                        </div>
-                        <div class="flight-aircraft">${flight.aircraft || 'UNKNOWN'}</div>
-                    </div>
-                    
-                    <div class="flight-details">
-                        <div class="flight-fplfiled">${fplTime}</div>
-                        <div class="detail-item">
-                            <span class="detail-label">Player</span>
-                            <span class="detail-value">${flight.player_name || 'Unknown'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Route</span>
-                            <span class="detail-value">${departure} → ${arrival}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="flight-details-expanded">
-                        <div class="flight-details">
-                            <div class="detail-item">
-                                <span class="detail-label">Heading</span>
-                                <span class="detail-value">${flight.heading || '---'}°</span>
+            const avgObtTime = stats.obt_times?.length > 0
+                ? (stats.obt_times.reduce((a, b) => a + b, 0) / stats.obt_times.length)
+                : null;
+
+            const airportHtml = `
+            <div class="airport-section">
+                <div class="airport-header">
+                    <div class="airport-name">${icao}</div>
+                    <div class="flight-counts">
+                        ${depCount > 0 ? `<div class="count departure-count">${depCount}↑</div>` : ''}
+                        ${arrCount > 0 ? `<div class="count arrival-count">${arrCount}↓</div>` : ''}
+                        ${avgTaxiTime !== null ? `
+                            <div class="count ${getTimeClass(avgTaxiTime, 'taxi')}" 
+                                 title="Average Taxi Time (${stats.taxi_times.length} flights)">
+                                ${avgTaxiTime.toFixed(1)}m
                             </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Altitude</span>
-                                <span class="detail-value">${flight.altitude || '---'} ft</span>
+                        ` : ''}
+                        ${avgObtTime !== null ? `
+                            <div class="count ${getTimeClass(avgObtTime, 'obt')}" 
+                                 title="Average Off-Block Time (${stats.obt_times.length} flights)">
+                                ${avgObtTime.toFixed(1)}m
                             </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Flight Level</span>
-                                <span class="detail-value">${flightLevel}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Speed</span>
-                                <span class="detail-value">${flight.speed || '---'} kts</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Ground Speed</span>
-                                <span class="detail-value">${flight.ground_speed || '---'} kts</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Flight Rules</span>
-                                <span class="detail-value">${flight.flightrules || '---'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Position</span>
-                                <span class="detail-value">${flight.pos_x || '---'}, ${flight.pos_y || '---'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Route</span>
-                                <span class="detail-value">${flight.route || 'Unknown'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">In-game callsign</span>
-                                <span class="detail-value">${flight.callsign || '---'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">State</span>
-                                <span class="detail-value">${FLIGHT_STATES[flight.state]?.name || 'Unknown'}</span>
-                            </div>
-                            ${flight.wind ? `
-                                <div class="detail-item">
-                                    <span class="detail-label">Wind</span>
-                                    <span class="detail-value">${flight.wind}</span>
-                                </div>
-                            ` : ''}
-                        </div>
+                        ` : ''}
                     </div>
                 </div>
-            `;
-            }).join('');
-        }
-
-        function getTimeClass(time, type) {
-            if (!time) return '';
-
-            if (type === 'taxi') {
-                if (time <= 5) return 'time-green';
-                if (time <= 7) return 'time-orange';
-                return 'time-red';
-            } else { // obt
-                if (time <= 10) return 'time-green';
-                if (time <= 15) return 'time-orange';
-                return 'time-red';
-            }
-        }
-
-        // Render airports and flights
-        async function renderAirports(airports, airportStats = {}) {
-            if (!airports || Object.keys(airports).length === 0) {
-                airportsContainer.innerHTML = '<div class="no-flights">No flight data available</div>';
-                return;
-            }
-
-            let html = '';
-            let staffChatHtml = '';
-            let unknownAirportHtml = '';
-
-            // Sort airports by flight count
-            const sortedAirports = Object.entries(airports).sort((a, b) => {
-                // ATC24 Staff Chat should be last
-                if (a[0] === "ATC24 Staff Chat") return 1;
-                if (b[0] === "ATC24 Staff Chat") return -1;
-
-                // UNKNOWN should be before Staff Chat but after others
-                if (a[0] === "UNKNOWN") return 1;
-                if (b[0] === "UNKNOWN") return -1;
-
-                // Calculate total flights for each airport
-                const aFlights = (a[1].departures?.length || 0) + (a[1].arrivals?.length || 0);
-                const bFlights = (b[1].departures?.length || 0) + (b[1].arrivals?.length || 0);
-
-                return bFlights - aFlights;
-            });
-
-            for (const [icao, airport] of sortedAirports) {
-                if (!airport) continue;
-
-                const depCount = airport.departures?.length || 0;
-                const arrCount = airport.arrivals?.length || 0;
-                const atcCount = airport.atc?.length || 0;
-
-                // Skip empty airports
-                if (depCount === 0 && arrCount === 0 && atcCount === 0) continue;
-
-                // Special handling for ATC24 Staff Chat and UNKNOWN
-                if (icao === "ATC24 Staff Chat") {
-                    staffChatHtml = renderStaffChat(airport);
-                    continue;
-                }
-
-                if (icao === "UNKNOWN") {
-                    unknownAirportHtml = renderUnknownAirport(airport);
-                    continue;
-                }
-
-                // Get airport stats
-                const stats = airportStats[icao] || {};
-                const avgTaxiTime = stats.taxi_times?.length > 0
-                    ? (stats.taxi_times.reduce((a, b) => a + b, 0) / stats.taxi_times.length)
-                    : null;
-
-                const avgObtTime = stats.obt_times?.length > 0
-                    ? (stats.obt_times.reduce((a, b) => a + b, 0) / stats.obt_times.length)
-                    : null;
-
-                const airportHtml = `
-                <div class="airport-section">
-                    <div class="airport-header">
-                        <div class="airport-name">${icao}</div>
-                        <div class="flight-counts">
-                            ${depCount > 0 ? `<div class="count departure-count">${depCount}↑</div>` : ''}
-                            ${arrCount > 0 ? `<div class="count arrival-count">${arrCount}↓</div>` : ''}
-                            ${avgTaxiTime !== null ? `
-                                <div class="count ${getTimeClass(avgTaxiTime, 'taxi')}" 
-                                     title="Average Taxi Time (${stats.taxi_times.length} flights)">
-                                    ${avgTaxiTime.toFixed(1)}m
-                                </div>
-                            ` : ''}
-                            ${avgObtTime !== null ? `
-                                <div class="count ${getTimeClass(avgObtTime, 'obt')}" 
-                                     title="Average Off-Block Time (${stats.obt_times.length} flights)">
-                                    ${avgObtTime.toFixed(1)}m
-                                </div>
-                            ` : ''}
-                        </div>
+                
+                ${showAtc && atcCount > 0 ? `
+                    <div class="atc-container" id="atc-${icao}">
+                        ${renderAtcPositions(airport.atc)}
                     </div>
-                    
-                    ${showAtc && atcCount > 0 ? `
-                        <div class="atc-container" id="atc-${icao}">
-                            ${renderAtcPositions(airport.atc)}
-                        </div>
-                    ` : ''}
-                    
-                    ${depCount > 0 ? `
-                        <div class="section-title">Departures</div>
-                        ${renderFlights(airport.departures)}
-                    ` : ''}
-                    
-                    ${arrCount > 0 ? `
-                        <div class="section-title">Arrivals</div>
-                        ${renderFlights(airport.arrivals)}
-                    ` : ''}
-                </div>
-            `;
+                ` : ''}
+                
+                ${depCount > 0 ? `
+                    <div class="section-title">Departures</div>
+                    ${renderFlights(airport.departures)}
+                ` : ''}
+                
+                ${arrCount > 0 ? `
+                    <div class="section-title">Arrivals</div>
+                    ${renderFlights(airport.arrivals)}
+                ` : ''}
+            </div>
+        `;
 
-                html += airportHtml;
-            }
-
-            // Combine all sections
-            html += staffChatHtml + unknownAirportHtml;
-
-            airportsContainer.innerHTML = html || '<div class="no-flights">No flights match current filters</div>';
-
-            // Add click handlers for flight cards
-            document.querySelectorAll('.flight-card').forEach(card => {
-                card.addEventListener('click', function () {
-                    const details = this.querySelector('.flight-details-expanded');
-                    if (details) {
-                        details.style.display = details.style.display === 'block' ? 'none' : 'block';
-                    }
-                });
-            });
+            html += airportHtml;
         }
+
+        // Combine all sections
+        html += staffChatHtml + unknownAirportHtml;
+
+        airportsContainer.innerHTML = html || '<div class="no-flights">No flights match current filters</div>';
+
+        // Add click handlers for flight cards
+        document.querySelectorAll('.flight-card').forEach(card => {
+            card.addEventListener('click', function () {
+                const details = this.querySelector('.flight-details-expanded');
+                if (details) {
+                    details.style.display = details.style.display === 'block' ? 'none' : 'block';
+                }
+            });
+        });
+    }
+
 
         // Update weather info
         function updateWeatherInfo(flightData) {
