@@ -20,6 +20,7 @@
             --atc-ground: #00FFFF;
             --refresh-off: #555555;
             --refresh-on: #ff4d4d;
+            --emergency-color: #ff4444;
         }
 
         body {
@@ -134,11 +135,15 @@
             font-size: 20px;
             font-weight: 600;
             color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .flight-counts {
             display: flex;
             gap: 10px;
+            align-items: center;
         }
 
         .count {
@@ -169,6 +174,12 @@
 
         .flight-card.live {
             border-left-color: var(--live-accent);
+        }
+
+        .flight-card.emergency {
+            border-left-color: var(--emergency-color);
+            background-color: rgba(255, 68, 68, 0.1);
+            animation: emergency-glow 2s infinite;
         }
 
         .flight-card:hover {
@@ -246,6 +257,40 @@
             font-size: 12px;
             font-weight: 500;
             margin-left: 8px;
+        }
+
+        .emergency-badge {
+            background-color: var(--emergency-color);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .airport-emergency-badge {
+            background-color: var(--emergency-color);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 12px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes emergency-glow {
+            0% { box-shadow: 0 0 5px rgba(255, 68, 68, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(255, 68, 68, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(255, 68, 68, 0.5); }
         }
 
         .section-title {
@@ -450,7 +495,7 @@
             font-weight: 500;
         }
 
-	.partnered_with {
+        .partnered_with {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -460,10 +505,11 @@
             font-size: 14px;
             margin-bottom: 15px;
         }
-	.partner_a {
-	    font-weight: 500;
-	    color: #fff;
-	}
+        
+        .partner_a {
+            font-weight: 500;
+            color: #fff;
+        }
     </style>
 </head>
 
@@ -471,12 +517,12 @@
     <div class="container">
         <h1>24schedule</h1>
 
-    <div class="partnered_with">
-<img src="https://raw.githubusercontent.com/deepslatetile/24schedule/main/handshake.png" alt=""
+        <div class="partnered_with">
+            <img src="https://raw.githubusercontent.com/deepslatetile/24schedule/main/handshake.png" alt=""
                 class="weather-icon">
-        <span class="partnersmol">Partnered with</span>
-        <a class="partner_a" href="https://discord.gg/ee63zyzrJh" class="partnerbig">ATC24Academy</a>
-    </div>
+            <span class="partnersmol">Partnered with</span>
+            <a class="partner_a" href="https://discord.gg/ee63zyzrJh" class="partnerbig">ATC24Academy</a>
+        </div>
 
         <div class="filters">
             <div class="filter-switch">
@@ -498,7 +544,6 @@
                 class="weather-icon">
             <span class="weather-value">Loading wind data...</span>
         </div>
-
 
         <div id="airportsContainer">
             <div class="loading">Loading flight data...</div>
@@ -686,6 +731,15 @@
         function renderUnknownAirport(airport) {
             if (!airport || !airport.flights || airport.flights.length === 0) return '';
 
+            // Sort flights: emergency first
+            const sortedFlights = [...airport.flights].sort((a, b) => {
+                const aEmergency = a.is_emergency || false;
+                const bEmergency = b.is_emergency || false;
+                if (aEmergency && !bEmergency) return -1;
+                if (!aEmergency && bEmergency) return 1;
+                return 0;
+            });
+
             return `
             <div class="airport-section">
                 <div class="airport-header">
@@ -696,7 +750,7 @@
                 </div>
                 
                 <div class="section-title">All Flights</div>
-                ${renderFlights(airport.flights)}
+                ${renderFlights(sortedFlights)}
             </div>
         `;
         }
@@ -774,9 +828,12 @@
                 const arrival = flight.arrival || 'UNKNOWN';
                 const fplTime = flight.fpl_created_time || "--:--";
                 const flightLevel = flight.flight_level ? `FL${Math.floor(flight.flight_level / 100)}` : 'N/A';
+                const isEmergency = flight.is_emergency || false;
+                const emergencyClass = isEmergency ? 'emergency' : '';
+                const emergencyBadge = isEmergency ? '<span class="emergency-badge">7700</span>' : '';
 
                 return `
-                <div class="flight-card ${flight.live ? 'live' : ''}" data-live="${flight.live}">
+                <div class="flight-card ${flight.live ? 'live' : ''} ${emergencyClass}" data-live="${flight.live}" data-emergency="${isEmergency}">
                     <div class="flight-header">
                         <div class="flight-callsign">
                             <img src="${ICON_BASE_URL}${FLIGHT_STATES[flight.state]?.icon || 'ground.png'}" 
@@ -785,6 +842,7 @@
                                  title="${FLIGHT_STATES[flight.state]?.name || 'Unknown'}">
                             ${flight.cs || flight.callsign || 'UNKNOWN'}
                             ${flight.live ? '<span class="live-badge">LIVE</span>' : ''}
+                            ${emergencyBadge}
                         </div>
                         <div class="flight-aircraft">${flight.aircraft || 'UNKNOWN'}</div>
                     </div>
@@ -857,17 +915,35 @@
         }
 
         function getTimeClass(time, type) {
-            if (!time) return '';
+    if (!time) return '';
 
-            if (type === 'taxi') {
-                if (time <= 5) return 'time-green';
-                if (time <= 7) return 'time-orange';
-                return 'time-red';
-            } else { // obt
-                if (time <= 10) return 'time-green';
-                if (time <= 15) return 'time-orange';
-                return 'time-red';
+    if (type === 'taxi') {
+        // Taxi Time: green < 3min, orange < 5min, red > 5min
+        if (time <= 3) return 'time-green';
+        if (time <= 5) return 'time-orange';
+        return 'time-red';
+    } else { // obt (Off-Block Time)
+        // OBT: green < 5min, orange < 10min, red > 10min
+        if (time <= 5) return 'time-green';
+        if (time <= 10) return 'time-orange';
+        return 'time-red';
+    }
+}
+
+        // Check if airport has emergency flights
+        function airportHasEmergencyFlights(airport) {
+            const departures = airport.departures || [];
+            const arrivals = airport.arrivals || [];
+            
+            for (const flight of departures) {
+                if (flight.is_emergency) return true;
             }
+            
+            for (const flight of arrivals) {
+                if (flight.is_emergency) return true;
+            }
+            
+            return false;
         }
 
         // Render airports and flights
@@ -881,7 +957,7 @@
             let staffChatHtml = '';
             let unknownAirportHtml = '';
 
-            // Sort airports by flight count
+            // Sort airports by flight count and emergency status
             const sortedAirports = Object.entries(airports).sort((a, b) => {
                 // ATC24 Staff Chat should be last
                 if (a[0] === "ATC24 Staff Chat") return 1;
@@ -890,6 +966,13 @@
                 // UNKNOWN should be before Staff Chat but after others
                 if (a[0] === "UNKNOWN") return 1;
                 if (b[0] === "UNKNOWN") return -1;
+
+                // Check for emergency flights
+                const aHasEmergency = airportHasEmergencyFlights(a[1]);
+                const bHasEmergency = airportHasEmergencyFlights(b[1]);
+                
+                if (aHasEmergency && !bHasEmergency) return -1;
+                if (!aHasEmergency && bHasEmergency) return 1;
 
                 // Calculate total flights for each airport
                 const aFlights = (a[1].departures?.length || 0) + (a[1].arrivals?.length || 0);
@@ -904,6 +987,8 @@
                 const depCount = airport.departures?.length || 0;
                 const arrCount = airport.arrivals?.length || 0;
                 const atcCount = airport.atc?.length || 0;
+                const hasEmergencyFlights = airportHasEmergencyFlights(airport);
+                const emergencyBadge = hasEmergencyFlights ? '<span class="airport-emergency-badge">7700</span>' : '';
 
                 // Skip empty airports
                 if (depCount === 0 && arrCount === 0 && atcCount === 0) continue;
@@ -929,10 +1014,27 @@
                     ? (stats.obt_times.reduce((a, b) => a + b, 0) / stats.obt_times.length)
                     : null;
 
+                // Sort flights: emergency first
+                const sortedDepartures = [...(airport.departures || [])].sort((a, b) => {
+                    const aEmergency = a.is_emergency || false;
+                    const bEmergency = b.is_emergency || false;
+                    if (aEmergency && !bEmergency) return -1;
+                    if (!aEmergency && bEmergency) return 1;
+                    return 0;
+                });
+
+                const sortedArrivals = [...(airport.arrivals || [])].sort((a, b) => {
+                    const aEmergency = a.is_emergency || false;
+                    const bEmergency = b.is_emergency || false;
+                    if (aEmergency && !bEmergency) return -1;
+                    if (!aEmergency && bEmergency) return 1;
+                    return 0;
+                });
+
                 const airportHtml = `
                 <div class="airport-section">
                     <div class="airport-header">
-                        <div class="airport-name">${icao}</div>
+                        <div class="airport-name">${icao}${emergencyBadge}</div>
                         <div class="flight-counts">
                             ${depCount > 0 ? `<div class="count departure-count">${depCount}↑</div>` : ''}
                             ${arrCount > 0 ? `<div class="count arrival-count">${arrCount}↓</div>` : ''}
@@ -959,12 +1061,12 @@
                     
                     ${depCount > 0 ? `
                         <div class="section-title">Departures</div>
-                        ${renderFlights(airport.departures)}
+                        ${renderFlights(sortedDepartures)}
                     ` : ''}
                     
                     ${arrCount > 0 ? `
                         <div class="section-title">Arrivals</div>
-                        ${renderFlights(airport.arrivals)}
+                        ${renderFlights(sortedArrivals)}
                     ` : ''}
                 </div>
             `;

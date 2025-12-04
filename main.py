@@ -13,9 +13,8 @@ app = Flask(__name__)
 cors_origins = ["*"]
 CORS(app, origins=cors_origins)
 
-# Global data stores
-dsr = {}  # Основное хранилище рейсов
-edsr = {}  # Хранилище event рейсов
+dsr = {}
+edsr = {}
 flight_times = defaultdict(dict)
 atc = {}
 
@@ -32,6 +31,7 @@ AIRPORTS = {
 	"IBTH": {"name": "Saint Barthélemy", "city": "Saint Barthélemy"},
 	"ILKL": {"name": "Lukla Airport", "city": "Perth"},
 	"IDCS": {"name": "Saba Airport", "city": "Orenji"},
+        "IBRD": {"name": "Bird Island", "city": "Orenji"}
 	"IJAF": {"name": "Al Najaf", "city": "Izolirani"},
 	"ITRC": {"name": "Training Centre", "city": "Rockford"},
 	"IBAR": {"name": "Barra Airport", "city": "Cyprus"},
@@ -64,7 +64,8 @@ AIRPORT_NAME_TO_ICAO = {
 	"Scampton": "ISCM",
 	"Henstridge": "IHEN",
 	"Garry": "IGAR",
-	"Skopelos": "ISKP"
+	"Skopelos": "ISKP",
+        "Bird Island": "IBRD",
 }
 
 ARPT_TO_CTR = {
@@ -83,6 +84,7 @@ ARPT_TO_CTR = {
 	'ISCM': "IZCC",
 	'ITKO': "IOCC",
 	'IDCS': "IOCC",
+        'IBRD': "IOCC",
 	'IPPH': "IPCC",
 	'ILKL': "IPCC",
 	'IBTH': "IBCC",
@@ -126,6 +128,7 @@ FREQ_LIST = {
 	'ITKO_TWR': '118.800',
 	'ITKO_GND': '118.225',
 	'IDCS_TWR': '118.250',
+        'IBRD_TWR': '118.300',
 	'IPCC_CTR': '135.250',
 	'IPPH_TWR': '127.400',
 	'IPPH_GND': '121.700',
@@ -241,6 +244,8 @@ AIRCRAFT_SHORT_NAMES = {
 	"English Electric Lightning": "LTNG",
 	"Douglas MD11": "MD11",
 	"Douglas MD11 Cargo": "MD11",
+        "Douglas MD10": "MD10",
+	"Douglas MD10 Cargo": "MD10",
 	"Douglas MD90": "MD90",
 	"Mig-15": "MG15",
 	"Piper PA28181": "P28A",
@@ -278,6 +283,7 @@ FLIGHT_STATES = {
 	6: {"name": "Training", "icon": "training.png"}
 }
 
+
 # WebSocket configuration
 WEBSOCKET_URL = "wss://24data.ptfs.app/wss"
 RECONNECT_DELAY = 2
@@ -286,537 +292,528 @@ LIVE_TIMEOUT = timedelta(seconds=10)
 
 
 async def listen_websocket(uri):
-	while True:
-		try:
-			print(f"Connecting to WebSocket at {uri}...")
-			async with websockets.connect(uri) as websocket:
-				print("WebSocket connected successfully!")
-				while True:
-					try:
-						wss_data = await websocket.recv()
-						process_websocket_data(wss_data)
-					except websockets.exceptions.ConnectionClosed as e:
-						print(f"WebSocket connection closed: {e}")
-						break
-					except Exception as e:
-						print(f"Error processing message: {e}")
-						break
-		except Exception as e:
-			print(f"WebSocket connection error: {e}")
-			print(f"Reconnecting in {RECONNECT_DELAY} seconds...")
-			await asyncio.sleep(RECONNECT_DELAY)
+    while True:
+        try:
+            print(f"Connecting to WebSocket at {uri}...")
+            async with websockets.connect(uri) as websocket:
+                print("WebSocket connected successfully!")
+                while True:
+                    try:
+                        wss_data = await websocket.recv()
+                        process_websocket_data(wss_data)
+                    except websockets.exceptions.ConnectionClosed as e:
+                        print(f"WebSocket connection closed: {e}")
+                        break
+                    except Exception as e:
+                        print(f"Error processing message: {e}")
+                        break
+        except Exception as e:
+            print(f"WebSocket connection error: {e}")
+            print(f"Reconnecting in {RECONNECT_DELAY} seconds...")
+            await asyncio.sleep(RECONNECT_DELAY)
 
 
 def process_websocket_data(wss_data):
-	try:
-		data = json.loads(wss_data) if isinstance(wss_data, str) else wss_data
-		if not isinstance(data, dict):
-			return
+    try:
+        data = json.loads(wss_data) if isinstance(wss_data, str) else wss_data
+        if not isinstance(data, dict):
+            return
 
-		received_at = datetime.now(timezone.utc)
-		msg_type = data.get("t")
-		msg_data = data.get("d", {})
+        received_at = datetime.now(timezone.utc)
+        msg_type = data.get("t")
+        msg_data = data.get("d", {})
 
-		if msg_type == "ACFT_DATA":
-			process_acft_data(msg_data, received_at=received_at)
-		elif msg_type == "FLIGHT_PLAN":
-			process_flight_plan(msg_data, received_at=received_at)
-		elif msg_type == "EVENT_ACFT_DATA":
-			process_acft_data(msg_data, event=True, received_at=received_at)
-		elif msg_type == "EVENT_FLIGHT_PLAN":
-			process_flight_plan(msg_data, event=True, received_at=received_at)
+        if msg_type == "ACFT_DATA":
+            process_acft_data(msg_data, received_at=received_at)
+        elif msg_type == "FLIGHT_PLAN":
+            process_flight_plan(msg_data, received_at=received_at)
+        elif msg_type == "EVENT_ACFT_DATA":
+            process_acft_data(msg_data, event=True, received_at=received_at)
+        elif msg_type == "EVENT_FLIGHT_PLAN":
+            process_flight_plan(msg_data, event=True, received_at=received_at)
 
-	# print(dsr)
+    # print(dsr)
 
-	except json.JSONDecodeError as e:
-		print(f"JSON decode error: {e}")
-	except Exception as e:
-		print(f"Error processing WebSocket data: {e}")
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {e}")
+    except Exception as e:
+        print(f"Error processing WebSocket data: {e}")
 
 
 def process_acft_data(data, event=False, received_at=None):
-	if received_at is None:
-		received_at = datetime.now(timezone.utc)
+    if received_at is None:
+        received_at = datetime.now(timezone.utc)
 
-	unalive_flights(event)
+    unalive_flights(event)
 
-	store = edsr if event else dsr
+    store = edsr if event else dsr
 
-	for realcallsign, flight_data in data.items():
-		player_name = flight_data.get("playerName")
-		if not player_name:
-			continue
+    for realcallsign, flight_data in data.items():
+        player_name = flight_data.get("playerName")
+        if not player_name:
+            continue
 
-		# Ищем существующий рейс по имени игрока
-		callsign = None
-		for cs, flight_info in store.items():
-			if flight_info.get("player_name") == player_name:
-				callsign = cs
-				break
+        callsign = None
+        for cs, flight_info in store.items():
+            if flight_info.get("player_name") == player_name:
+                callsign = cs
+                break
 
-		# Если рейс не найден, создаем новый с realcallsign в качестве ключа
-		if callsign is None:
-			callsign = realcallsign
-			if callsign not in store:
-				store[callsign] = {}
+        if callsign is None:
+            callsign = realcallsign
+            if callsign not in store:
+                store[callsign] = {}
 
-		# Сохраняем предыдущее состояние для отслеживания изменений
-		previous_state = store[callsign].get("state", 0)
+        previous_state = store[callsign].get("state", 0)
 
-		store[callsign].update({
-			"realcallsign": realcallsign,
-			"heading": flight_data.get("heading"),
-			"player_name": player_name,
-			"altitude": flight_data.get("altitude"),
-			"aircraft": AIRCRAFT_SHORT_NAMES.get(
-				flight_data.get("aircraftType"),
-				flight_data.get("aircraftType")
-			),
-			"pos_x": flight_data.get("position", {}).get("x"),
-			"pos_y": flight_data.get("position", {}).get("y"),
-			"speed": flight_data.get("speed"),
-			"ground_speed": round(flight_data.get("groundSpeed", 0), 0),
-			"wind": flight_data.get("wind"),
-			"is_on_ground": flight_data.get("isOnGround", False),
-			"live": True,
-			"data_valid": True,
-			"last_fresh_time": received_at,
-			"state": get_flight_state(callsign, flight_data, event=event),
-			"previous_state": previous_state,
-			# Сохраняем отображаемый callsign, если он уже есть в данных
-			"cs": store[callsign].get("cs", realcallsign)
-		})
+        store[callsign].update({
+            "realcallsign": realcallsign,
+            "heading": flight_data.get("heading"),
+            "player_name": player_name,
+            "altitude": flight_data.get("altitude"),
+            "aircraft": AIRCRAFT_SHORT_NAMES.get(
+                flight_data.get("aircraftType"),
+                flight_data.get("aircraftType")
+            ),
+            "pos_x": flight_data.get("position", {}).get("x"),
+            "pos_y": flight_data.get("position", {}).get("y"),
+            "speed": flight_data.get("speed"),
+            "ground_speed": round(flight_data.get("groundSpeed", 0), 0),
+            "wind": flight_data.get("wind"),
+            "is_on_ground": flight_data.get("isOnGround", False),
+            "live": True,
+            "data_valid": True,
+            "last_fresh_time": received_at,
+            "state": get_flight_state(callsign, flight_data, event=event),
+            "previous_state": previous_state,
+            "is_emergency": flight_data.get("isEmergencyOccuring", False),
+            "cs": store[callsign].get("cs", realcallsign)
+        })
 
-		if not event:
-			track_flight_times(callsign, store[callsign], received_at)
+        if not event:
+            track_flight_times(callsign, store[callsign], received_at)
 
 
 def process_flight_plan(data, event=False, received_at=None):
-	if received_at is None:
-		received_at = datetime.now(timezone.utc)
+    if received_at is None:
+        received_at = datetime.now(timezone.utc)
 
-	player_name = data.get("robloxName")
-	callsign_from_fpl = data.get("callsign")
-	realcallsign = data.get("realcallsign")
+    player_name = data.get("robloxName")
+    callsign_from_fpl = data.get("callsign")
+    realcallsign = data.get("realcallsign")
 
-	if not player_name:
-		return
+    if not player_name:
+        return
 
-	store = edsr if event else dsr
+    store = edsr if event else dsr
 
-	# Ищем существующий рейс по имени игрока
-	existing_callsign = None
-	for cs, flight_info in store.items():
-		if flight_info.get("player_name") == player_name:
-			existing_callsign = cs
-			break
+    existing_callsign = None
+    for cs, flight_info in store.items():
+        if flight_info.get("player_name") == player_name:
+            existing_callsign = cs
+            break
 
-	# Если рейс найден, используем его callsign, иначе создаем новый
-	if existing_callsign:
-		callsign = existing_callsign
-		# Очищаем старые данные флайтплана
-		if "departure" in store[callsign]:
-			del store[callsign]["departure"]
-		if "arrival" in store[callsign]:
-			del store[callsign]["arrival"]
-		if "flight_level" in store[callsign]:
-			del store[callsign]["flight_level"]
-		if "flightrules" in store[callsign]:
-			del store[callsign]["flightrules"]
-		if "route" in store[callsign]:
-			del store[callsign]["route"]
-	else:
-		# Создаем новый рейс, используя callsign из флайтплана или realcallsign
-		callsign = callsign_from_fpl if callsign_from_fpl else realcallsign
-		if callsign not in store:
-			store[callsign] = {}
+    if existing_callsign:
+        callsign = existing_callsign
+        if "departure" in store[callsign]:
+            del store[callsign]["departure"]
+        if "arrival" in store[callsign]:
+            del store[callsign]["arrival"]
+        if "flight_level" in store[callsign]:
+            del store[callsign]["flight_level"]
+        if "flightrules" in store[callsign]:
+            del store[callsign]["flightrules"]
+        if "route" in store[callsign]:
+            del store[callsign]["route"]
+    else:
+        callsign = callsign_from_fpl if callsign_from_fpl else realcallsign
+        if callsign not in store:
+            store[callsign] = {}
 
-	# Парсим flight level
-	flight_level = 0
-	try:
-		fl_str = data.get("flightlevel", "FL0").replace("FL", "").lstrip("0")
-		flight_level = 100 * int(fl_str) if fl_str else 0
-	except (ValueError, AttributeError):
-		flight_level = 0
+    flight_level = 0
+    try:
+        fl_str = data.get("flightlevel", "FL0").replace("FL", "").lstrip("0")
+        flight_level = 100 * int(fl_str) if fl_str else 0
+    except (ValueError, AttributeError):
+        flight_level = 0
 
-	# Обновляем данные рейса
-	store[callsign].update({
-		"realcallsign": realcallsign,
-		"fpl_created_time": received_at.strftime("%H:%M") + "z",
-		"departure": data.get("departing", "ZZZZ"),
-		"arrival": data.get("arriving", "ZZZZ"),
-		"flight_level": flight_level,
-		"player_name": player_name,
-		"aircraft": AIRCRAFT_SHORT_NAMES.get(data.get("aircraft"), data.get("aircraft")),
-		"flightrules": data.get("flightrules"),
-		"route": data.get("route", "N/A"),
-		"data_valid": False,
-		"live": False,
-		"last_fresh_time": received_at,
-		"state": 0,
-		"previous_state": 0,
-		"cs": callsign_from_fpl if callsign_from_fpl else realcallsign  # Отображаемый позывной
-	})
+    # Обновляем данные рейса
+    store[callsign].update({
+        "realcallsign": realcallsign,
+        "fpl_created_time": received_at.strftime("%H:%M") + "z",
+        "departure": data.get("departing", "ZZZZ"),
+        "arrival": data.get("arriving", "ZZZZ"),
+        "flight_level": flight_level,
+        "player_name": player_name,
+        "aircraft": AIRCRAFT_SHORT_NAMES.get(data.get("aircraft"), data.get("aircraft")),
+        "flightrules": data.get("flightrules"),
+        "route": data.get("route", "N/A"),
+        "data_valid": False,
+        "live": False,
+        "last_fresh_time": received_at,
+        "state": 0,
+        "previous_state": 0,
+        "is_emergency": data.get("isEmergencyOccuring", False),
+        "cs": callsign_from_fpl if callsign_from_fpl else realcallsign
+    })
 
-	# Инициализируем tracking times
-	if callsign not in flight_times:
-		flight_times[callsign] = {}
+    if callsign not in flight_times:
+        flight_times[callsign] = {}
 
-	# Всегда обновляем время создания флайтплана
-	flight_times[callsign].update({
-		"fpl_created": received_at,
-		"last_update": received_at,
-	})
+    flight_times[callsign].update({
+        "fpl_created": received_at,
+        "last_update": received_at,
+    })
 
 
 def track_flight_times(callsign, flight_data, received_at):
-	if callsign not in dsr:
-		return
+    if callsign not in dsr:
+        return
 
-	current_state = flight_data.get("state", 0)
-	previous_state = flight_data.get("previous_state", 0)
+    current_state = flight_data.get("state", 0)
+    previous_state = flight_data.get("previous_state", 0)
+    
+    # Инициализируем запись времени, если её нет
+    if callsign not in flight_times:
+        flight_times[callsign] = {}
+    
+    # Фиксируем начало движения (Taxiing) - состояние 1
+    if current_state == 1 and previous_state < 1:
+        # Если ещё не зафиксировали начало движения
+        if "taxi_start" not in flight_times[callsign]:
+            flight_times[callsign]["taxi_start"] = received_at
+            print(f"📝 {callsign}: Taxi started at {received_at.strftime('%H:%M:%S')}")
 
-	# Переход на state 1 (Taxiing) - начало руления
-	if current_state == 1 and previous_state < 1:
-		if "taxi_start" not in flight_times[callsign]:
-			flight_times[callsign]["taxi_start"] = received_at
-
-	# Переход на state 2 или выше (Climbing/Cruise) - взлет
-	if current_state >= 2 and previous_state < 2:
-		if "off_block_time" not in flight_times[callsign]:
-			flight_times[callsign]["off_block_time"] = received_at
-			# Если не было начала руления, но уже взлет - устанавливаем taxi_start как текущее время
-			if "taxi_start" not in flight_times[callsign]:
-				flight_times[callsign]["taxi_start"] = received_at
+    # Фиксируем взлет (Off-Block) - переход с state 1 на state 2 или выше
+    if current_state >= 2 and previous_state < 2:
+        # Если ещё не зафиксировали взлет
+        if "off_block_time" not in flight_times[callsign]:
+            flight_times[callsign]["off_block_time"] = received_at
+            print(f"✈️ {callsign}: Off-block at {received_at.strftime('%H:%M:%S')}")
+            # Если по какой-то причине пропустили taxi_start, используем время взлета
+            if "taxi_start" not in flight_times[callsign]:
+                flight_times[callsign]["taxi_start"] = received_at
 
 
 def get_flight_state(callsign, flight_data, event=False):
-	store = edsr if event else dsr
-	data = store.get(callsign, {})
+    store = edsr if event else dsr
+    data = store.get(callsign, {})
 
-	# Получаем текущие параметры полета
-	is_on_ground = flight_data.get("isOnGround", False)
-	speed = flight_data.get("speed", 0)
-	altitude = flight_data.get("altitude", 0)
-	previous_state = data.get("state", 0)
-	departure = data.get("departure", "")
-	arrival = data.get("arrival", "")
+    is_on_ground = flight_data.get("isOnGround", False)
+    speed = flight_data.get("speed", 0)
+    altitude = flight_data.get("altitude", 0)
+    previous_state = data.get("state", 0)
+    departure = data.get("departure", "")
+    arrival = data.get("arrival", "")
 
-	# Определяем круизный эшелон (примерно 30,000 ft)
-	cruise_altitude = 30000
-	is_training_flight = departure and departure == arrival
+    cruise_altitude = 25000  # Снизим порог для круизной высоты
+    is_training_flight = departure and departure == arrival
 
-	# Проверка на некорректное состояние (в небе, но state=5)
-	if not is_on_ground and previous_state == 5:
-		return 2  # Переводим в состояние Climbing
+    # State 6 - Training (имеет приоритет над другими состояниями в небе)
+    if not is_on_ground and is_training_flight:
+        return 6
 
-	# State 6 - Training (имеет приоритет над другими состояниями в небе)
-	if not is_on_ground and is_training_flight:
-		return 6
+    # State 5 - Arrived (на земле, скорость < 5, был в небе)
+    if is_on_ground and speed < 5 and previous_state in {2, 3, 4}:
+        return 5
 
-	# State 5 - Arrived (на земле, скорость < 10, был в небе)
-	if is_on_ground and speed < 10 and previous_state in {2, 3, 4}:
-		return 5
+    # State 1 - Taxiing (на земле, скорость >= 5)
+    if is_on_ground and speed >= 5 and speed < 50:  # Исключаем взлетную скорость
+        return 1
 
-	# State 1 - Taxiing (на земле, скорость > 10)
-	if is_on_ground and speed >= 10:
-		return 1
+    # State 0 - Boarding (на земле, скорость < 5, не был в небе)
+    if is_on_ground and speed < 5 and previous_state not in {2, 3, 4, 5}:
+        return 0
 
-	# State 0 - Boarding (на земле, скорость < 10, не был в небе)
-	if is_on_ground and speed < 10 and previous_state not in {2, 3, 4, 5}:
-		return 0
+    # State 2 - Climbing (в небе, был на рулении или boarding)
+    if not is_on_ground and previous_state in {0, 1}:
+        return 2
 
-	# State 3 - Cruise (в небе, на круизном эшелоне)
-	if not is_on_ground and altitude >= cruise_altitude:
-		return 3
+    # State 4 - Descending (в небе, снижение, был на круизе или наборе)
+    if not is_on_ground and previous_state in {2, 3} and speed < 300:  # При снижении скорость уменьшается
+        return 4
 
-	# State 4 - Descending (в небе, ниже круизного эшелона, был на круизе или наборе)
-	if not is_on_ground and altitude < cruise_altitude and previous_state in {2, 3}:
-		return 4
+    # State 3 - Cruise (в небе, на круизной высоте)
+    if not is_on_ground and altitude >= cruise_altitude:
+        return 3
 
-	# State 2 - Climbing (в небе, был на рулении)
-	if not is_on_ground and previous_state == 1:
-		return 2
-
-	# Если ни одно условие не подошло, возвращаем предыдущее состояние
-	return previous_state
+    # Если ни одно условие не подошло, возвращаем предыдущее состояние
+    return previous_state
 
 
 def unalive_flights(event=False):
-	current_time = datetime.now(timezone.utc)
-	store = edsr if event else dsr
+    current_time = datetime.now(timezone.utc)
+    store = edsr if event else dsr
 
-	for callsign, data in store.items():
-		if data.get("live") and data.get("last_fresh_time"):
-			if current_time - data["last_fresh_time"] > LIVE_TIMEOUT:
-				data["live"] = False
+    for callsign, data in store.items():
+        if data.get("live") and data.get("last_fresh_time"):
+            if current_time - data["last_fresh_time"] > LIVE_TIMEOUT:
+                data["live"] = False
 
 
 def cleanup_old_data():
-	current_time = datetime.now(timezone.utc)
+    current_time = datetime.now(timezone.utc)
 
-	for store in [dsr, edsr]:
-		to_delete = [
-			callsign
-			for callsign, data in store.items()
-			if data.get("last_fresh_time")
-			   and (current_time - data["last_fresh_time"]) > DATA_TIMEOUT
-		]
+    for store in [dsr, edsr]:
+        to_delete = [
+            callsign
+            for callsign, data in store.items()
+            if data.get("last_fresh_time")
+               and (current_time - data["last_fresh_time"]) > DATA_TIMEOUT
+        ]
 
-		for callsign in to_delete:
-			del store[callsign]
-			if callsign in flight_times:
-				del flight_times[callsign]
+        for callsign in to_delete:
+            del store[callsign]
+            if callsign in flight_times:
+                del flight_times[callsign]
+                print(f"🧹 Удалены устаревшие данные для {callsign}")
+
+    # Очистка устаревших flight_times (старше 2 часов)
+    flight_times_to_delete = [
+        callsign
+        for callsign, times in flight_times.items()
+        if "fpl_created" in times and (current_time - times["fpl_created"]) > timedelta(hours=2)
+    ]
+    
+    for callsign in flight_times_to_delete:
+        del flight_times[callsign]
+        print(f"🧹 Удалены устаревшие flight_times для {callsign}")
 
 
 def calculate_airport_stats():
-	airport_stats = defaultdict(lambda: {"taxi_times": [], "obt_times": []})
-	current_time = datetime.now(timezone.utc)
-	one_hour_ago = current_time - timedelta(hours=1)
+    airport_stats = defaultdict(lambda: {"taxi_times": [], "obt_times": []})
+    current_time = datetime.now(timezone.utc)
+    one_hour_ago = current_time - timedelta(hours=1)
 
-	for callsign, times in flight_times.items():
-		if callsign not in dsr:
-			continue
+    for callsign, times in flight_times.items():
+        if callsign not in dsr:
+            continue
 
-		# Пропускаем рейсы старше 1 часа
-		if "fpl_created" in times and times["fpl_created"] < one_hour_ago:
-			continue
+        # Skip old data (older than 1 hour)
+        if "fpl_created" in times and times["fpl_created"] < one_hour_ago:
+            continue
 
-		departure = dsr[callsign].get("departure")
-		if not departure:
-			continue
+        departure = dsr[callsign].get("departure")
+        if not departure:
+            continue
 
-		current_state = dsr[callsign].get("state", 0)
+        current_state = dsr[callsign].get("state", 0)
 
-		# Calculate OBT - от создания флайтплана до изменения state на 1 или выше
-		if "fpl_created" in times and current_state >= 1:
-			# Находим время первого перехода на state >= 1
-			transition_time = None
+        # Calculate OBT (Off-Block Time) - время от подачи плана полета до начала движения (state 1)
+        if "fpl_created" in times and "taxi_start" in times:
+            # Проверяем, что рейс начал движение (state 1)
+            if current_state >= 1:
+                # Время OBT = taxi_start - fpl_created
+                obt_time = (times["taxi_start"] - times["fpl_created"]).total_seconds() / 60
+                # Исключаем нереалистичные значения (отрицательные или слишком большие)
+                if 0 < obt_time < 120:  # От 0 до 120 минут
+                    airport_stats[departure]["obt_times"].append(obt_time)
 
-			if "taxi_start" in times:
-				transition_time = times["taxi_start"]  # Начало руления
-			elif "off_block_time" in times:
-				transition_time = times["off_block_time"]  # Взлет (если пропустили state 1)
+        # Calculate Taxi Time - время от начала движения (state 1) до взлета (state 2)
+        if "taxi_start" in times and "off_block_time" in times:
+            # Проверяем, что рейс взлетел (state 2 или выше)
+            if current_state >= 2:
+                # Время Taxi = off_block_time - taxi_start
+                taxi_time = (times["off_block_time"] - times["taxi_start"]).total_seconds() / 60
+                # Исключаем нереалистичные значения
+                if 0 < taxi_time < 60:  # От 0 до 60 минут
+                    airport_stats[departure]["taxi_times"].append(taxi_time)
 
-			if transition_time:
-				obt_time = (transition_time - times["fpl_created"]).total_seconds() / 60
-				airport_stats[departure]["obt_times"].append(obt_time)
-
-		# Calculate Taxi Time - от начала руления (state 1) до взлета (state 2 или выше)
-		if "taxi_start" in times and current_state >= 2:
-			# Находим время перехода на state >= 2 (взлет)
-			takeoff_time = None
-
-			if "off_block_time" in times:
-				takeoff_time = times["off_block_time"]  # Взлет
-			else:
-				# Если нет точного времени взлета, используем время первого перехода на state >= 2
-				# Это может быть приблизительное время
-				pass
-
-			if takeoff_time:
-				taxi_time = (takeoff_time - times["taxi_start"]).total_seconds() / 60
-				airport_stats[departure]["taxi_times"].append(taxi_time)
-
-	return airport_stats
+    return airport_stats
 
 
 def get_active_arpts():
-	active = []
-	for callsign, data in dsr.items():
-		if data.get('departure') and data.get('arrival'):
-			dep = data['departure']
-			arr = data['arrival']
-			if dep not in active:
-				active.append(dep)
-			if arr not in active:
-				active.append(arr)
-	return active
+    active = []
+    for callsign, data in dsr.items():
+        if data.get('departure') and data.get('arrival'):
+            dep = data['departure']
+            arr = data['arrival']
+            if dep not in active:
+                active.append(dep)
+            if arr not in active:
+                active.append(arr)
+    return active
 
 
 def fetch_atc_data():
-	try:
-		response = requests.get('https://24data.ptfs.app/controllers', timeout=5)
-		response.raise_for_status()
-		controllers = response.json()
+    try:
+        response = requests.get('https://24data.ptfs.app/controllers', timeout=5)
+        response.raise_for_status()
+        controllers = response.json()
 
-		active_arpt = get_active_arpts()
-		filtered_controllers = []
-		for controller in controllers:
-			if controller.get("holder"):
-				active_arpt.append(CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")))
+        active_arpt = get_active_arpts()
+        filtered_controllers = []
+        for controller in controllers:
+            if controller.get("holder"):
+                active_arpt.append(CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")))
 
-			filtered_controllers.append({
-				"holder": controller.get("holder"),
-				"airport": CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")),
-				"position": controller.get("position"),
-				"queue": controller.get("queue", []),
-				"frequency": FREQ_LIST.get(f'{controller.get("airport")}_{controller.get("position")}')
-			})
+            filtered_controllers.append({
+                "holder": controller.get("holder"),
+                "airport": CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")),
+                "position": controller.get("position"),
+                "queue": controller.get("queue", []),
+                "frequency": FREQ_LIST.get(f'{controller.get("airport")}_{controller.get("position")}')
+            })
 
-		active_boys = {}
-		active_firs = []
+        active_boys = {}
+        active_firs = []
 
-		for bigboy in filtered_controllers:
-			if bigboy["holder"] and bigboy["position"] == "CTR":
-				airport_icao = bigboy['airport']
-				if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
-					fir_airport = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
-					active_firs.append(fir_airport)
+        for bigboy in filtered_controllers:
+            if bigboy["holder"] and bigboy["position"] == "CTR":
+                airport_icao = bigboy['airport']
+                if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
+                    fir_airport = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
+                    active_firs.append(fir_airport)
 
-					active_boys[f"{airport_icao}_CTR"] = {
-						"holder": bigboy["holder"],
-						"queue": bigboy["queue"],
-						"frequency": bigboy["frequency"],
-					}
+                    active_boys[f"{airport_icao}_CTR"] = {
+                        "holder": bigboy["holder"],
+                        "queue": bigboy["queue"],
+                        "frequency": bigboy["frequency"],
+                    }
 
-		major_arpt = 'ISAU IGRV ITKO IPPH IZOL ILAR IBTH IRFD'.split(' ')
-		print("Active FIRs:", ", ".join(active_firs))
-		controllers_copy = filtered_controllers.copy()
+        major_arpt = 'ISAU IGRV ITKO IPPH IZOL ILAR IBTH IRFD'.split(' ')
+        print("Active FIRs:", ", ".join(active_firs))
+        controllers_copy = filtered_controllers.copy()
 
-		for mj in controllers_copy:
-			airport_icao = mj["airport"]
-			if airport_icao not in major_arpt:
-				if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
-					fir = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
-					if fir in active_firs:
-						ctr_key = f"{fir}_CTR"
-						if ctr_key in active_boys and airport_icao in active_arpt:
-							filtered_controllers.append({
-								"holder": active_boys[ctr_key]["holder"],
-								"airport": airport_icao,
-								"position": f"CTR",
-								"queue": active_boys[ctr_key]["queue"],
-								"frequency": active_boys[ctr_key]["frequency"]
-							})
+        for mj in controllers_copy:
+            airport_icao = mj["airport"]
+            if airport_icao not in major_arpt:
+                if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
+                    fir = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
+                    if fir in active_firs:
+                        ctr_key = f"{fir}_CTR"
+                        if ctr_key in active_boys and airport_icao in active_arpt:
+                            filtered_controllers.append({
+                                "holder": active_boys[ctr_key]["holder"],
+                                "airport": airport_icao,
+                                "position": f"CTR",
+                                "queue": active_boys[ctr_key]["queue"],
+                                "frequency": active_boys[ctr_key]["frequency"]
+                            })
 
-		# СОРТИРОВКА: сначала CTR, потом TWR, потом GND, потом остальные
-		position_priority = {'CTR': 0, 'TWR': 1, 'GND': 2}
+        position_priority = {'CTR': 0, 'TWR': 1, 'GND': 2}
 
-		def sort_key(controller):
-			pos = controller['position']
-			# Если позиция есть в приоритетах - используем приоритет, иначе ставим в конец
-			priority = position_priority.get(pos, 99)
-			# Дополнительно сортируем по аэропорту для одинаковых позиций
-			return priority, controller['airport']
+        def sort_key(controller):
+            pos = controller['position']
+            priority = position_priority.get(pos, 99)
+            return priority, controller['airport']
 
-		# Сортируем контроллеров
-		filtered_controllers.sort(key=sort_key)
+        filtered_controllers.sort(key=sort_key)
 
-		global atc
-		atc = filtered_controllers
+        global atc
+        atc = filtered_controllers
 
-		pepe = []
-		for ps in filtered_controllers:
-			if ps["holder"]:
-				queue_count = len(ps['queue'])
-				queue_str = f" ({queue_count})" if queue_count > 0 else ""
-				pepe.append(ps["airport"] + "_" + ps["position"] + queue_str)
+        pepe = []
+        for ps in filtered_controllers:
+            if ps["holder"]:
+                queue_count = len(ps['queue'])
+                queue_str = f" ({queue_count})" if queue_count > 0 else ""
+                pepe.append(ps["airport"] + "_" + ps["position"] + queue_str)
 
-		print("Active controllers:", ", ".join(pepe))
-		print("ATC data updated successfully")
+        print("Active controllers:", ", ".join(pepe))
+        print("ATC data updated successfully")
 
-	except requests.exceptions.RequestException as e:
-		print(f"Error fetching ATC data: {e}")
-	except json.JSONDecodeError as e:
-		print(f"Error parsing ATC data: {e}")
-	except Exception as e:
-		print(f"Unexpected error in fetch_atc_data: {e}")
-		import traceback
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching ATC data: {e}")
+    except json.JSONDecodeError as e:
+        print(f"Error parsing ATC data: {e}")
+    except Exception as e:
+        print(f"Unexpected error in fetch_atc_data: {e}")
+        import traceback
 
-		traceback.print_exc()
+        traceback.print_exc()
 
 
 def run_atc_updater():
-	while True:
-		fetch_atc_data()
-		time.sleep(10)
+    while True:
+        fetch_atc_data()
+        time.sleep(10)
 
 
 @app.route("/")
 def index():
-	try:
-		with open('web.html', 'r', encoding='utf-8') as file:
-			return file.read()
-	except FileNotFoundError:
-		return "Error: web.html file not found", 404
-	except Exception as e:
-		return f"Error loading web page: {str(e)}", 500
+    try:
+        with open('web.html', 'r', encoding='utf-8') as file:
+            return file.read()
+    except FileNotFoundError:
+        return "Error: web.html file not found", 404
+    except Exception as e:
+        return f"Error loading web page: {str(e)}", 500
 
 
 @app.route("/event/")
 def index_event():
-	try:
-		with open('webevent.html', 'r', encoding='utf-8') as file:
-			return file.read()
-	except FileNotFoundError:
-		return "Error: webevent.html file not found", 404
-	except Exception as e:
-		return f"Error loading web page: {str(e)}", 500
+    try:
+        with open('webevent.html', 'r', encoding='utf-8') as file:
+            return file.read()
+    except FileNotFoundError:
+        return "Error: webevent.html file not found", 404
+    except Exception as e:
+        return f"Error loading web page: {str(e)}", 500
 
 
 @app.route('/api/v1/dsr')
 def api_v1_dsr():
-	try:
-		# print(dsr)
-		return json.dumps(dsr, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
-	except Exception as e:
-		return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+    try:
+        # print(dsr)
+        return json.dumps(dsr, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
 
 
 @app.route('/api/v1/edsr')
 def api_v1_edsr():
-	try:
-		# print(edsr)
-		return json.dumps(edsr, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
-	except Exception as e:
-		return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+    try:
+        # print(edsr)
+        return json.dumps(edsr, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
 
 
 @app.route('/api/v1/atc')
 def api_v1_atc():
-	try:
-		return json.dumps(atc, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
-	except Exception as e:
-		return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+    try:
+        return json.dumps(atc, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
 
 
 @app.route('/api/v1/airport_stats')
 def api_v1_airport_stats():
-	try:
-		stats = calculate_airport_stats()
-		return json.dumps(stats, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
-	except Exception as e:
-		return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+    try:
+        stats = calculate_airport_stats()
+        return json.dumps(stats, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
 
 
 def run_websocket_client():
-	loop = asyncio.new_event_loop()
-	asyncio.set_event_loop(loop)
-	loop.run_until_complete(listen_websocket(WEBSOCKET_URL))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(listen_websocket(WEBSOCKET_URL))
 
 
 def run_cleanup_loop():
-	while True:
-		cleanup_old_data()
-		time.sleep(60)
+    while True:
+        cleanup_old_data()
+        time.sleep(60)
 
 
 if __name__ == "__main__":
-	# Start WebSocket client in background thread
-	ws_thread = threading.Thread(target=run_websocket_client)
-	ws_thread.daemon = True
-	ws_thread.start()
+    # Start WebSocket client in background thread
+    ws_thread = threading.Thread(target=run_websocket_client)
+    ws_thread.daemon = True
+    ws_thread.start()
 
-	# Start cleanup thread
-	cleanup_thread = threading.Thread(target=run_cleanup_loop)
-	cleanup_thread.daemon = True
-	cleanup_thread.start()
+    # Start cleanup thread
+    cleanup_thread = threading.Thread(target=run_cleanup_loop)
+    cleanup_thread.daemon = True
+    cleanup_thread.start()
 
-	# Start ATC updater thread
-	atc_thread = threading.Thread(target=run_atc_updater)
-	atc_thread.daemon = True
-	atc_thread.start()
+    # Start ATC updater thread
+    atc_thread = threading.Thread(target=run_atc_updater)
+    atc_thread.daemon = True
+    atc_thread.start()
 
-	print("Starting Flask application...")
-	app.run(host='0.0.0.0', port=2424, debug=False)
+    print("Starting Flask application...")
+    app.run(host='0.0.0.0', port=2424, debug=False)
