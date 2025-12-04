@@ -17,6 +17,7 @@ dsr = {}
 edsr = {}
 flight_times = defaultdict(dict)
 atc = {}
+atis = {}
 
 AIRPORTS = {
 	"IRFD": {"name": "Greater Rockford", "city": "Rockford"},
@@ -31,7 +32,7 @@ AIRPORTS = {
 	"IBTH": {"name": "Saint Barthélemy", "city": "Saint Barthélemy"},
 	"ILKL": {"name": "Lukla Airport", "city": "Perth"},
 	"IDCS": {"name": "Saba Airport", "city": "Orenji"},
-        "IBRD": {"name": "Bird Island", "city": "Orenji"}
+        "IBRD": {"name": "Bird Island", "city": "Orenji"},
 	"IJAF": {"name": "Al Najaf", "city": "Izolirani"},
 	"ITRC": {"name": "Training Centre", "city": "Rockford"},
 	"IBAR": {"name": "Barra Airport", "city": "Cyprus"},
@@ -647,12 +648,16 @@ def fetch_atc_data():
             if controller.get("holder"):
                 active_arpt.append(CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")))
 
+            # Добавляем название позиции (например: IBCC_CTR)
+            position_name = f'{controller.get("airport")}_{controller.get("position")}'
+            
             filtered_controllers.append({
                 "holder": controller.get("holder"),
                 "airport": CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")),
                 "position": controller.get("position"),
                 "queue": controller.get("queue", []),
-                "frequency": FREQ_LIST.get(f'{controller.get("airport")}_{controller.get("position")}')
+                "frequency": FREQ_LIST.get(f'{controller.get("airport")}_{controller.get("position")}'),
+                "position_name": position_name  # Добавляем название позиции
             })
 
         active_boys = {}
@@ -669,6 +674,7 @@ def fetch_atc_data():
                         "holder": bigboy["holder"],
                         "queue": bigboy["queue"],
                         "frequency": bigboy["frequency"],
+                        "position_name": bigboy["position_name"]
                     }
 
         major_arpt = 'ISAU IGRV ITKO IPPH IZOL ILAR IBTH IRFD'.split(' ')
@@ -686,9 +692,10 @@ def fetch_atc_data():
                             filtered_controllers.append({
                                 "holder": active_boys[ctr_key]["holder"],
                                 "airport": airport_icao,
-                                "position": f"CTR",
+                                "position": "CTR",
                                 "queue": active_boys[ctr_key]["queue"],
-                                "frequency": active_boys[ctr_key]["frequency"]
+                                "frequency": active_boys[ctr_key]["frequency"],
+                                "position_name": f"{airport_icao}_CTR"  # Добавляем название позиции
                             })
 
         position_priority = {'CTR': 0, 'TWR': 1, 'GND': 2}
@@ -708,7 +715,7 @@ def fetch_atc_data():
             if ps["holder"]:
                 queue_count = len(ps['queue'])
                 queue_str = f" ({queue_count})" if queue_count > 0 else ""
-                pepe.append(ps["airport"] + "_" + ps["position"] + queue_str)
+                pepe.append(ps["position_name"] + queue_str)
 
         print("Active controllers:", ", ".join(pepe))
         print("ATC data updated successfully")
@@ -720,13 +727,33 @@ def fetch_atc_data():
     except Exception as e:
         print(f"Unexpected error in fetch_atc_data: {e}")
         import traceback
-
         traceback.print_exc()
 
 
-def run_atc_updater():
+def fetch_atis_data():
+    try:
+        response = requests.get('https://24data.ptfs.app/atis', timeout=5)
+        response.raise_for_status()
+        atis_data = response.json()
+        
+        global atis
+        atis = {item["airport"]: item for item in atis_data if "airport" in item}
+        
+        print(f"ATIS data updated: {len(atis)} airports")
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching ATIS data: {e}")
+    except json.JSONDecodeError as e:
+        print(f"Error parsing ATIS data: {e}")
+    except Exception as e:
+        print(f"Unexpected error in fetch_atis_data: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def run_updater():
     while True:
-        fetch_atc_data()
+        update_all_data()
         time.sleep(10)
 
 
@@ -787,11 +814,24 @@ def api_v1_airport_stats():
         return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
 
 
+@app.route('/api/v1/atis')
+def api_v1_atis():
+    try:
+        return json.dumps(atis, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+    
+
 def run_websocket_client():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(listen_websocket(WEBSOCKET_URL))
 
+
+def update_all_data():
+    fetch_atc_data()
+    fetch_atis_data()
+    
 
 def run_cleanup_loop():
     while True:
@@ -811,7 +851,7 @@ if __name__ == "__main__":
     cleanup_thread.start()
 
     # Start ATC updater thread
-    atc_thread = threading.Thread(target=run_atc_updater)
+    atc_thread = threading.Thread(target=run_updater)
     atc_thread.daemon = True
     atc_thread.start()
 
