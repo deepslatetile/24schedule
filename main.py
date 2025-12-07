@@ -529,7 +529,7 @@ def cleanup_old_data():
     current_time = datetime.now(timezone.utc)
 
     # Очистка обычных данных
-    for store, times_store in [(dsr, flight_times), (edsr, event_flight_times)]:
+    for store, times_store in [(dsr, flight_times)]:
         to_delete = [
             callsign
             for callsign, data in store.items()
@@ -544,11 +544,11 @@ def cleanup_old_data():
                 print(f"🧹 Удалены устаревшие данные для {callsign}")
 
     # Очистка устаревших flight_times
-    for times_store in [flight_times, event_flight_times]:
+    for times_store in [flight_times]:
         times_to_delete = [
             callsign
             for callsign, times in times_store.items()
-            if "fpl_created" in times and (current_time - times["fpl_created"]) > timedelta(hours=2)
+            if "fpl_created" in times and (current_time - times["fpl_created"]) > timedelta(hours=tdel)
         ]
 
         for callsign in times_to_delete:
