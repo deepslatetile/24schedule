@@ -608,11 +608,11 @@ margin: 10px 10px 10px 10px;
 
     <script>
     // Configuration
-    const FLIGHTS_API_URL = 'http://10.10.48.154:2424/api/v1/dsr';
-    const ATC_API_URL = 'http://10.10.48.154:2424/api/v1/atc';
-    const ATIS_API_URL = 'http://10.10.48.154:2424/api/v1/atis';
+    const FLIGHTS_API_URL = 'https://two4schedule.onrender.com/api/v1/dsr';
+    const ATC_API_URL = 'https://two4schedule.onrender.com/api/v1/atc';
+    const ATIS_API_URL = 'https://two4schedule.onrender.com/api/v1/atis';
     const ICON_BASE_URL = 'https://raw.githubusercontent.com/deepslatetile/24schedule/main/';
-    const AIRPORT_STATS_API_URL = 'http://10.10.48.154:2424/api/v1/airport_stats';
+    const AIRPORT_STATS_API_URL = 'https://two4schedule.onrender.com/api/v1/airport_stats';
     const REFRESH_INTERVAL = 5000;
 
     // Flight states
@@ -1230,7 +1230,7 @@ margin: 10px 10px 10px 10px;
                 fetchFlightData(),
                 showAtc ? fetchAtcData() : Promise.resolve(null),
                 fetch(AIRPORT_STATS_API_URL).then(res => res.json()).catch(() => ({})),
-                fetch('http://10.10.48.154:2424/api/v1/atis').then(res => res.json()).catch(() => ({}))
+                fetch('https://two4schedule.onrender.com/api/v1/atis').then(res => res.json()).catch(() => ({}))
             ]);
 
             if (flightData) {

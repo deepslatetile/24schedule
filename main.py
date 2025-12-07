@@ -1,23 +1,46 @@
+
 import asyncio
 import json
 import threading
 import time
+import os
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
-from flask import Flask
+from flask import Flask, request, jsonify
 import websockets
 import requests
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Загрузка переменных окружения
+load_dotenv()
 
 app = Flask(__name__)
 cors_origins = ["*"]
 CORS(app, origins=cors_origins)
 
-dsr = {}
-edsr = {}
+# Конфигурация из .env
+FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
+FLASK_PORT = int(os.getenv("FLASK_PORT", 2424))
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+EXTERNAL_API_URL = os.getenv("EXTERNAL_API_URL", "https://24data.ptfs.app")
+AUTH_TOKEN = os.getenv("AUTH_TOKEN", "default_event_token")
+ATC_UPDATE_INTERVAL = int(os.getenv("ATC_UPDATE_INTERVAL", 10))
+ATIS_UPDATE_INTERVAL = int(os.getenv("ATIS_UPDATE_INTERVAL", 30))
+WEBSOCKET_UPDATE_INTERVAL = int(os.getenv("WEBSOCKET_UPDATE_INTERVAL", 5))
+WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "wss://24data.ptfs.app/wss")
+
+# Раздельные хранилища для обычных и ивентовых данных
+dsr = {}  # Обычные рейсы
+edsr = {}  # Ивентовые рейсы
 flight_times = defaultdict(dict)
-atc = {}
-atis = {}
+event_flight_times = defaultdict(dict)
+
+# Раздельные хранилища ATC и ATIS
+atc = []  # Обычные ATC (получаем из внешнего API)
+eatc = []  # Ивентовые ATC (приходят POST запросом)
+atis = {}  # Обычные ATIS (получаем из внешнего API)
+eatis = {}  # Ивентовые ATIS (приходят POST запросом)
 
 AIRPORTS = {
     "IRFD": {"name": "Greater Rockford", "city": "Rockford", "fir": "IRCC"},
@@ -257,9 +280,7 @@ FLIGHT_STATES = {
     6: {"name": "Training", "icon": "training.png"}
 }
 
-
-# WebSocket configuration
-WEBSOCKET_URL = "wss://24data.ptfs.app/wss"
+# Конфигурация
 RECONNECT_DELAY = 2
 DATA_TIMEOUT = timedelta(minutes=30)
 LIVE_TIMEOUT = timedelta(seconds=10)
@@ -306,8 +327,6 @@ def process_websocket_data(wss_data):
         elif msg_type == "EVENT_FLIGHT_PLAN":
             process_flight_plan(msg_data, event=True, received_at=received_at)
 
-    # print(dsr)
-
     except json.JSONDecodeError as e:
         print(f"JSON decode error: {e}")
     except Exception as e:
@@ -321,6 +340,7 @@ def process_acft_data(data, event=False, received_at=None):
     unalive_flights(event)
 
     store = edsr if event else dsr
+    times_store = event_flight_times if event else flight_times
 
     for realcallsign, flight_data in data.items():
         player_name = flight_data.get("playerName")
@@ -339,6 +359,7 @@ def process_acft_data(data, event=False, received_at=None):
                 store[callsign] = {}
 
         previous_state = store[callsign].get("state", 0)
+        current_state = get_flight_state(callsign, flight_data, event=event)
 
         store[callsign].update({
             "realcallsign": realcallsign,
@@ -358,14 +379,15 @@ def process_acft_data(data, event=False, received_at=None):
             "live": True,
             "data_valid": True,
             "last_fresh_time": received_at,
-            "state": get_flight_state(callsign, flight_data, event=event),
+            "state": current_state,
             "previous_state": previous_state,
             "is_emergency": flight_data.get("isEmergencyOccuring", False),
             "cs": store[callsign].get("cs", realcallsign)
         })
 
+        # Трекинг времени для обычных рейсов
         if not event:
-            track_flight_times(callsign, store[callsign], received_at)
+            track_flight_times(callsign, store[callsign], received_at, previous_state, current_state)
 
 
 def process_flight_plan(data, event=False, received_at=None):
@@ -380,6 +402,7 @@ def process_flight_plan(data, event=False, received_at=None):
         return
 
     store = edsr if event else dsr
+    times_store = event_flight_times if event else flight_times
 
     existing_callsign = None
     for cs, flight_info in store.items():
@@ -389,16 +412,9 @@ def process_flight_plan(data, event=False, received_at=None):
 
     if existing_callsign:
         callsign = existing_callsign
-        if "departure" in store[callsign]:
-            del store[callsign]["departure"]
-        if "arrival" in store[callsign]:
-            del store[callsign]["arrival"]
-        if "flight_level" in store[callsign]:
-            del store[callsign]["flight_level"]
-        if "flightrules" in store[callsign]:
-            del store[callsign]["flightrules"]
-        if "route" in store[callsign]:
-            del store[callsign]["route"]
+        for field in ["departure", "arrival", "flight_level", "flightrules", "route"]:
+            if field in store[callsign]:
+                del store[callsign][field]
     else:
         callsign = callsign_from_fpl if callsign_from_fpl else realcallsign
         if callsign not in store:
@@ -411,7 +427,6 @@ def process_flight_plan(data, event=False, received_at=None):
     except (ValueError, AttributeError):
         flight_level = 0
 
-    # Обновляем данные рейса
     store[callsign].update({
         "realcallsign": realcallsign,
         "fpl_created_time": received_at.strftime("%H:%M") + "z",
@@ -431,42 +446,35 @@ def process_flight_plan(data, event=False, received_at=None):
         "cs": callsign_from_fpl if callsign_from_fpl else realcallsign
     })
 
-    if callsign not in flight_times:
-        flight_times[callsign] = {}
+    if callsign not in times_store:
+        times_store[callsign] = {}
 
-    flight_times[callsign].update({
+    times_store[callsign].update({
         "fpl_created": received_at,
         "last_update": received_at,
     })
 
 
-def track_flight_times(callsign, flight_data, received_at):
-    if callsign not in dsr:
-        return
-
-    current_state = flight_data.get("state", 0)
-    previous_state = flight_data.get("previous_state", 0)
-    
-    # Инициализируем запись времени, если её нет
+def track_flight_times(callsign, flight_data, received_at, previous_state, current_state):
+    """Трекинг времени для рейсов"""
     if callsign not in flight_times:
         flight_times[callsign] = {}
-    
-    # Фиксируем начало движения (Taxiing) - состояние 1
-    if current_state == 1 and previous_state < 1:
-        # Если ещё не зафиксировали начало движения
+
+    # Фиксируем начало Off-Block (state 0 -> state 1)
+    if current_state == 1 and previous_state == 0:
+        if "obt_start" not in flight_times[callsign]:
+            flight_times[callsign]["obt_start"] = received_at
+            print(f"⏱️ {callsign}: Off-Block started at {received_at.strftime('%H:%M:%S')}")
+
+    # Фиксируем начало Taxi (state 1 -> state 2 или выше)
+    elif current_state >= 2 and previous_state == 1:
         if "taxi_start" not in flight_times[callsign]:
             flight_times[callsign]["taxi_start"] = received_at
-            print(f"📝 {callsign}: Taxi started at {received_at.strftime('%H:%M:%S')}")
+            print(f"🚕 {callsign}: Taxi started at {received_at.strftime('%H:%M:%S')}")
 
-    # Фиксируем взлет (Off-Block) - переход с state 1 на state 2 или выше
-    if current_state >= 2 and previous_state < 2:
-        # Если ещё не зафиксировали взлет
-        if "off_block_time" not in flight_times[callsign]:
-            flight_times[callsign]["off_block_time"] = received_at
-            print(f"✈️ {callsign}: Off-block at {received_at.strftime('%H:%M:%S')}")
-            # Если по какой-то причине пропустили taxi_start, используем время взлета
-            if "taxi_start" not in flight_times[callsign]:
-                flight_times[callsign]["taxi_start"] = received_at
+            # Если OBT ещё не зафиксирован, фиксируем его тоже
+            if "obt_start" not in flight_times[callsign]:
+                flight_times[callsign]["obt_start"] = received_at
 
 
 def get_flight_state(callsign, flight_data, event=False):
@@ -480,38 +488,30 @@ def get_flight_state(callsign, flight_data, event=False):
     departure = data.get("departure", "")
     arrival = data.get("arrival", "")
 
-    cruise_altitude = 25000  # Снизим порог для круизной высоты
+    cruise_altitude = 25000
     is_training_flight = departure and departure == arrival
 
-    # State 6 - Training (имеет приоритет над другими состояниями в небе)
     if not is_on_ground and is_training_flight:
         return 6
 
-    # State 5 - Arrived (на земле, скорость < 5, был в небе)
     if is_on_ground and speed < 5 and previous_state in {2, 3, 4}:
         return 5
 
-    # State 1 - Taxiing (на земле, скорость >= 5)
-    if is_on_ground and speed >= 5 and speed < 50:  # Исключаем взлетную скорость
+    if is_on_ground and speed >= 5 and speed < 50:
         return 1
 
-    # State 0 - Boarding (на земле, скорость < 5, не был в небе)
     if is_on_ground and speed < 5 and previous_state not in {2, 3, 4, 5}:
         return 0
 
-    # State 2 - Climbing (в небе, был на рулении или boarding)
     if not is_on_ground and previous_state in {0, 1}:
         return 2
 
-    # State 4 - Descending (в небе, снижение, был на круизе или наборе)
-    if not is_on_ground and previous_state in {2, 3} and speed < 300:  # При снижении скорость уменьшается
+    if not is_on_ground and previous_state in {2, 3} and speed < 300:
         return 4
 
-    # State 3 - Cruise (в небе, на круизной высоте)
     if not is_on_ground and altitude >= cruise_altitude:
         return 3
 
-    # Если ни одно условие не подошло, возвращаем предыдущее состояние
     return previous_state
 
 
@@ -528,7 +528,8 @@ def unalive_flights(event=False):
 def cleanup_old_data():
     current_time = datetime.now(timezone.utc)
 
-    for store in [dsr, edsr]:
+    # Очистка обычных данных
+    for store, times_store in [(dsr, flight_times), (edsr, event_flight_times)]:
         to_delete = [
             callsign
             for callsign, data in store.items()
@@ -538,67 +539,69 @@ def cleanup_old_data():
 
         for callsign in to_delete:
             del store[callsign]
-            if callsign in flight_times:
-                del flight_times[callsign]
+            if callsign in times_store:
+                del times_store[callsign]
                 print(f"🧹 Удалены устаревшие данные для {callsign}")
 
-    # Очистка устаревших flight_times (старше 2 часов)
-    flight_times_to_delete = [
-        callsign
-        for callsign, times in flight_times.items()
-        if "fpl_created" in times and (current_time - times["fpl_created"]) > timedelta(hours=2)
-    ]
-    
-    for callsign in flight_times_to_delete:
-        del flight_times[callsign]
-        print(f"🧹 Удалены устаревшие flight_times для {callsign}")
+    # Очистка устаревших flight_times
+    for times_store in [flight_times, event_flight_times]:
+        times_to_delete = [
+            callsign
+            for callsign, times in times_store.items()
+            if "fpl_created" in times and (current_time - times["fpl_created"]) > timedelta(hours=2)
+        ]
+
+        for callsign in times_to_delete:
+            del times_store[callsign]
 
 
-def calculate_airport_stats():
+def calculate_airport_stats(event=False):
+    """Расчёт статистики аэропортов"""
     airport_stats = defaultdict(lambda: {"taxi_times": [], "obt_times": []})
     current_time = datetime.now(timezone.utc)
     one_hour_ago = current_time - timedelta(hours=1)
 
-    for callsign, times in flight_times.items():
-        if callsign not in dsr:
+    store = edsr if event else dsr
+    times_store = event_flight_times if event else flight_times
+
+    for callsign, times in times_store.items():
+        if callsign not in store:
             continue
 
-        # Skip old data (older than 1 hour)
+        # Пропускаем старые данные (старше 1 часа)
         if "fpl_created" in times and times["fpl_created"] < one_hour_ago:
             continue
 
-        departure = dsr[callsign].get("departure")
+        departure = store[callsign].get("departure")
         if not departure:
             continue
 
-        current_state = dsr[callsign].get("state", 0)
+        # Расчёт Off-Block Time (OBT) - время от подачи плана до начала движения (state 0 -> state 1)
+        if "fpl_created" in times and "obt_start" in times:
+            obt_time = (times["obt_start"] - times["fpl_created"]).total_seconds() / 60
+            if 0 < obt_time < 120:  # От 0 до 120 минут
+                airport_stats[departure]["obt_times"].append(obt_time)
 
-        # Calculate OBT (Off-Block Time) - время от подачи плана полета до начала движения (state 1)
-        if "fpl_created" in times and "taxi_start" in times:
-            # Проверяем, что рейс начал движение (state 1)
-            if current_state >= 1:
-                # Время OBT = taxi_start - fpl_created
-                obt_time = (times["taxi_start"] - times["fpl_created"]).total_seconds() / 60
-                # Исключаем нереалистичные значения (отрицательные или слишком большие)
-                if 0 < obt_time < 120:  # От 0 до 120 минут
-                    airport_stats[departure]["obt_times"].append(obt_time)
-
-        # Calculate Taxi Time - время от начала движения (state 1) до взлета (state 2)
-        if "taxi_start" in times and "off_block_time" in times:
-            # Проверяем, что рейс взлетел (state 2 или выше)
+        # Расчёт Taxi Time - время от начала движения до взлета (state 1 -> state 2)
+        if "taxi_start" in times:
+            # Нужно время когда рейс взлетел (state >= 2)
+            # Пока просто используем текущее время если рейс уже в state >= 2
+            current_state = store[callsign].get("state", 0)
             if current_state >= 2:
-                # Время Taxi = off_block_time - taxi_start
-                taxi_time = (times["off_block_time"] - times["taxi_start"]).total_seconds() / 60
-                # Исключаем нереалистичные значения
+                # Для простоты используем время последнего обновления
+                taxi_time = (times.get("last_update", current_time) - times["taxi_start"]).total_seconds() / 60
                 if 0 < taxi_time < 60:  # От 0 до 60 минут
                     airport_stats[departure]["taxi_times"].append(taxi_time)
 
     return airport_stats
 
 
-def get_active_arpts():
+def get_active_arpts(event=False):
+    """Получение активных аэропортов"""
     active = set()
-    for callsign, data in dsr.items():
+    store = edsr if event else dsr
+
+    for callsign, data in store.items():
         if data.get('departure') and data.get('arrival'):
             dep = data['departure']
             arr = data['arrival']
@@ -609,13 +612,15 @@ def get_active_arpts():
     return active
 
 
-def fetch_atc_data():
+def fetch_external_atc_data():
+    """Получение обычных ATC данных из внешнего API (GET запрос)"""
     try:
-        response = requests.get('https://24data.ptfs.app/controllers', timeout=5)
+        url = f"{EXTERNAL_API_URL}/controllers"
+        response = requests.get(url, timeout=5)
         response.raise_for_status()
         controllers = response.json()
 
-        active_arpt = get_active_arpts()
+        active_arpt = get_active_arpts(event=False)
         active_firs = []
         filtered_controllers = []
 
@@ -676,56 +681,76 @@ def fetch_atc_data():
 
         global atc
         atc = filtered_controllers
-
-        pepe = []
-        for ps in filtered_controllers:
-            if ps["holder"]:
-                queue_count = len(ps['queue'])
-                queue_str = f" ({queue_count})" if queue_count > 0 else ""
-                pepe.append(ps["position_name"] + queue_str)
-
-        print("Active controllers:", ", ".join(pepe))
-        print("ATC data updated successfully")
+        print(f"External ATC data updated: {len(atc)} controllers")
 
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching ATC data: {e}")
+        print(f"Error fetching external ATC data: {e}")
     except json.JSONDecodeError as e:
-        print(f"Error parsing ATC data: {e}")
+        print(f"Error parsing external ATC data: {e}")
     except Exception as e:
-        print(f"Unexpected error in fetch_atc_data: {e}")
+        print(f"Unexpected error in fetch_external_atc_data: {e}")
         import traceback
         traceback.print_exc()
 
 
-def fetch_atis_data():
+def fetch_external_atis_data():
+    """Получение обычных ATIS данных из внешнего API (GET запрос)"""
     try:
-        response = requests.get('https://24data.ptfs.app/atis', timeout=5)
+        url = f"{EXTERNAL_API_URL}/atis"
+        response = requests.get(url, timeout=5)
         response.raise_for_status()
         atis_data = response.json()
-        
+
         global atis
         atis = {item["airport"]: item for item in atis_data if "airport" in item}
-        
-        print(f"ATIS data updated: {len(atis)} airports")
-        
+        print(f"External ATIS data updated: {len(atis)} airports")
+
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching ATIS data: {e}")
+        print(f"Error fetching external ATIS data: {e}")
     except json.JSONDecodeError as e:
-        print(f"Error parsing ATIS data: {e}")
+        print(f"Error parsing external ATIS data: {e}")
     except Exception as e:
-        print(f"Unexpected error in fetch_atis_data: {e}")
+        print(f"Unexpected error in fetch_external_atis_data: {e}")
         import traceback
         traceback.print_exc()
 
 
 def run_updater():
+    """Обновление внешних данных"""
+    atc_counter = 0
+    atis_counter = 0
+
     while True:
-        update_all_data()
-        time.sleep(10)
+        # Обновляем ATC каждые ATC_UPDATE_INTERVAL секунд
+        if atc_counter % ATC_UPDATE_INTERVAL == 0:
+            fetch_external_atc_data()
+
+        # Обновляем ATIS каждые ATIS_UPDATE_INTERVAL секунд
+        if atis_counter % ATIS_UPDATE_INTERVAL == 0:
+            fetch_external_atis_data()
+
+        atc_counter += 1
+        atis_counter += 1
+        time.sleep(1)
+
+
+def check_auth():
+    """Проверка авторизации для POST запросов"""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return False
+
+    # Проверяем Bearer token
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        return token == AUTH_TOKEN
+
+    return False
 
 
 @app.route("/")
 def index():
+    """Главная страница (обычная версия)"""
     try:
         with open('web.html', 'r', encoding='utf-8') as file:
             return file.read()
@@ -737,6 +762,7 @@ def index():
 
 @app.route("/event/")
 def index_event():
+    """Страница ивентов"""
     try:
         with open('webevent.html', 'r', encoding='utf-8') as file:
             return file.read()
@@ -746,26 +772,19 @@ def index_event():
         return f"Error loading web page: {str(e)}", 500
 
 
+# API эндпоинты для обычных данных (GET запросы к внешнему API)
 @app.route('/api/v1/dsr')
 def api_v1_dsr():
+    """API для обычных рейсов"""
     try:
-        # print(dsr)
         return json.dumps(dsr, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
-    except Exception as e:
-        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
-
-
-@app.route('/api/v1/edsr')
-def api_v1_edsr():
-    try:
-        # print(edsr)
-        return json.dumps(edsr, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
     except Exception as e:
         return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
 
 
 @app.route('/api/v1/atc')
 def api_v1_atc():
+    """API для обычных ATC"""
     try:
         return json.dumps(atc, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
     except Exception as e:
@@ -774,8 +793,9 @@ def api_v1_atc():
 
 @app.route('/api/v1/airport_stats')
 def api_v1_airport_stats():
+    """API для статистики аэропортов (обычные)"""
     try:
-        stats = calculate_airport_stats()
+        stats = calculate_airport_stats(event=False)
         return json.dumps(stats, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
     except Exception as e:
         return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
@@ -783,44 +803,131 @@ def api_v1_airport_stats():
 
 @app.route('/api/v1/atis')
 def api_v1_atis():
+    """API для обычных ATIS"""
     try:
         return json.dumps(atis, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
     except Exception as e:
         return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
-    
+
+
+# API эндпоинты для ивентовых данных (приходят через WebSocket)
+@app.route('/api/v1/edsr')
+def api_v1_edsr():
+    """API для ивентовых рейсов"""
+    try:
+        return json.dumps(edsr, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+
+@app.route('/api/v1/eatc')
+def api_v1_eatc():
+    """API для ивентовых ATC"""
+    try:
+        return json.dumps(eatc, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+
+@app.route('/api/v1/eairport_stats')
+def api_v1_eairport_stats():
+    """API для статистики аэропортов (ивенты)"""
+    try:
+        stats = calculate_airport_stats(event=True)
+        return json.dumps(stats, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+
+@app.route('/api/v1/eatis')
+def api_v1_eatis():
+    """API для ивентовых ATIS"""
+    try:
+        return json.dumps(eatis, default=str, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+
+# POST эндпоинты для приёма ивентовых данных (с авторизацией)
+@app.route('/api/v1/event/atc', methods=['POST'])
+def api_v1_event_atc():
+    """POST endpoint для приёма ивентовых ATC данных"""
+    try:
+        # Проверка авторизации
+        if not check_auth():
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        global eatc
+        eatc = data
+
+        print(f"Event ATC data received via POST: {len(eatc)} controllers")
+        return jsonify({"status": "success", "count": len(eatc)}), 200
+
+    except Exception as e:
+        print(f"Error processing event ATC data: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/event/atis', methods=['POST'])
+def api_v1_event_atis():
+    """POST endpoint для приёма ивентовых ATIS данных"""
+    try:
+        # Проверка авторизации
+        if not check_auth():
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        global eatis
+        eatis = {item["airport"]: item for item in data if "airport" in item}
+
+        print(f"Event ATIS data received via POST: {len(eatis)} airports")
+        return jsonify({"status": "success", "count": len(eatis)}), 200
+
+    except Exception as e:
+        print(f"Error processing event ATIS data: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 def run_websocket_client():
+    """Запуск WebSocket клиента"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(listen_websocket(WEBSOCKET_URL))
 
 
-def update_all_data():
-    fetch_atc_data()
-    fetch_atis_data()
-    
-
 def run_cleanup_loop():
+    """Запуск цикла очистки старых данных"""
     while True:
         cleanup_old_data()
         time.sleep(60)
 
 
 if __name__ == "__main__":
-    # Start WebSocket client in background thread
+    # Запуск WebSocket клиента в фоновом потоке
     ws_thread = threading.Thread(target=run_websocket_client)
     ws_thread.daemon = True
     ws_thread.start()
 
-    # Start cleanup thread
+    # Запуск очистки старых данных
     cleanup_thread = threading.Thread(target=run_cleanup_loop)
     cleanup_thread.daemon = True
     cleanup_thread.start()
 
-    # Start ATC updater thread
-    atc_thread = threading.Thread(target=run_updater)
-    atc_thread.daemon = True
-    atc_thread.start()
+    # Запуск обновления внешних данных
+    updater_thread = threading.Thread(target=run_updater)
+    updater_thread.daemon = True
+    updater_thread.start()
 
-    print("Starting Flask application...")
-    app.run(host='0.0.0.0', port=2424, debug=False)
+    print(f"Starting Flask application on {FLASK_HOST}:{FLASK_PORT}...")
+    print(f"Debug mode: {DEBUG}")
+    print(f"External API: {EXTERNAL_API_URL}")
+    print(f"Auth token: {'*' * len(AUTH_TOKEN) if AUTH_TOKEN else 'Not set'}")
+
+    app.run(host=FLASK_HOST, port=FLASK_PORT, debug=DEBUG)
