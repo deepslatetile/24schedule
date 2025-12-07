@@ -626,7 +626,7 @@ def fetch_atc_data():
             
             filtered_controllers.append({
                 "holder": controller.get("holder"),
-                "airport": controller.get("airport", 'ZZZZ'),
+                "airport": CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport", 'ZZZZ')),
                 "position": controller.get('position', 'ZZZ'),
                 "queue": controller.get("queue", []),
                 "frequency": FREQ_LIST.get(position_name, 'ZZZ.ZZZ'),
