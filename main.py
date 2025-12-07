@@ -670,7 +670,7 @@ def fetch_external_atc_data():
                             "position_name": position_name
                         })
 
-        position_priority = {'CTR': 0, 'TWR': 1, 'GND': 2}
+        position_priority = {'CTR': 0, 'APP': 1, 'TWR': 2, 'GND': 3}
 
         def sort_key(controller):
             pos = controller['position']
