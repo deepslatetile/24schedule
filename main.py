@@ -629,7 +629,7 @@ def fetch_atc_data():
                 "airport": controller.get("airport", 'ZZZZ'),
                 "position": controller.get('position', 'ZZZ'),
                 "queue": controller.get("queue", []),
-                "frequency": FREQ_LIST.get(position_name, ZZZ.ZZZ),
+                "frequency": FREQ_LIST.get(position_name, 'ZZZ.ZZZ'),
                 "position_name": position_name
             })
             
