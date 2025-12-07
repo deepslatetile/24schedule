@@ -347,6 +347,10 @@ margin: 10px 10px 10px 10px;
             border-left: 3px solid var(--atc-tower);
         }
 
+        .atc-position.approach {
+            border-left: 3px solid var(--atc-tower);
+        }
+
         .atc-position.center {
             border-left: 3px solid var(--atc-center);
         }
@@ -853,6 +857,9 @@ margin: 10px 10px 10px 10px;
             if (position.position === "CTR") {
                 iconName = "center_atc.png";
                 positionClass = "center";
+            } else if (position.position === "APP") {
+                iconName = "approach_atc.png";
+                positionClass = "approach";
             } else if (position.position === "TWR") {
                 iconName = "tower_atc.png";
                 positionClass = "tower";
