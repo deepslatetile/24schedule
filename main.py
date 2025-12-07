@@ -20,28 +20,28 @@ atc = {}
 atis = {}
 
 AIRPORTS = {
-	"IRFD": {"name": "Greater Rockford", "city": "Rockford"},
-	"ILAR": {"name": "Larnaca Intl.", "city": "Cyprus"},
-	"IZOL": {"name": "Izolirani Intl.", "city": "Izolirani"},
-	"ITKO": {"name": "Tokyo Intl.", "city": "Orenji"},
-	"IPPH": {"name": "Perth Intl.", "city": "Perth"},
-	"IGRV": {"name": "Grindavik Airport", "city": "Grindavik"},
-	"IPAP": {"name": "Paphos Intl.", "city": "Cyprus"},
-	"IMLR": {"name": "Mellor Intl.", "city": "Rockford"},
-	"ISAU": {"name": "Sauthemptona", "city": "Sauthemptona"},
-	"IBTH": {"name": "Saint Barthélemy", "city": "Saint Barthélemy"},
-	"ILKL": {"name": "Lukla Airport", "city": "Perth"},
-	"IDCS": {"name": "Saba Airport", "city": "Orenji"},
-        "IBRD": {"name": "Bird Island", "city": "Orenji"},
-	"IJAF": {"name": "Al Najaf", "city": "Izolirani"},
-	"ITRC": {"name": "Training Centre", "city": "Rockford"},
-	"IBAR": {"name": "Barra Airport", "city": "Cyprus"},
-	"IBLT": {"name": "Boltic Airfield", "city": "Rockford"},
-	"IIAB": {"name": "McConnell AFB", "city": "Cyprus"},
-	"ISCM": {"name": "RAF Scampton", "city": "Izolirani"},
-	"IHEN": {"name": "Henstridge Airfield", "city": "Cyprus"},
-	"IGAR": {"name": "Air Base Garry", "city": "Rockford"},
-	"ISKP": {"name": "Skopelos Airfield", "city": "Skopelos"}
+	"IRFD": {"name": "Greater Rockford", "city": "Rockford", "fir": "IRCC"},
+	"ILAR": {"name": "Larnaca Intl.", "city": "Cyprus"}, "fir": "ICCC"},
+	"IZOL": {"name": "Izolirani Intl.", "city": "Izolirani", "fir": "IZCC"},
+	"ITKO": {"name": "Tokyo Intl.", "city": "Orenji", "fir": "IOCC"},
+	"IPPH": {"name": "Perth Intl.", "city": "Perth", "fir": "IPCC"},
+	"IGRV": {"name": "Grindavik Airport", "city": "Grindavik", "fir": "IGCC"},
+	"IPAP": {"name": "Paphos Intl.", "city": "Cyprus", "fir": "ICCC"},
+	"IMLR": {"name": "Mellor Intl.", "city": "Rockford", "fir": "IRCC"},
+	"ISAU": {"name": "Sauthemptona", "city": "Sauthemptona", "fir": "ISCC"},
+	"IBTH": {"name": "Saint Barthélemy", "city": "Saint Barthélemy", "fir": "IBCC"},
+	"ILKL": {"name": "Lukla Airport", "city": "Perth", "fir": "IPCC"},
+	"IDCS": {"name": "Saba Airport", "city": "Orenji", "fir": "IOCC"},
+        "IBRD": {"name": "Bird Island", "city": "Orenji", "fir": "IOCC"},
+	"IJAF": {"name": "Al Najaf", "city": "Izolirani", "fir": "IZCC"},
+	"ITRC": {"name": "Training Centre", "city": "Rockford", "fir": "IRCC"},
+	"IBAR": {"name": "Barra Airport", "city": "Cyprus", "fir": "ICCC"},
+	"IBLT": {"name": "Boltic Airfield", "city": "Rockford", "fir": "IRCC"},
+	"IIAB": {"name": "McConnell AFB", "city": "Cyprus", "fir": "ICCC"},
+	"ISCM": {"name": "RAF Scampton", "city": "Izolirani", "fir": "IZCC"},
+	"IHEN": {"name": "Henstridge Airfield", "city": "Cyprus", "fir": "ICCC"},
+	"IGAR": {"name": "Air Base Garry", "city": "Rockford", "fir": "IRCC"},
+	"ISKP": {"name": "Skopelos Airfield", "city": "Skopelos", "fir": "IBCC"}
 }
 
 AIRPORT_NAME_TO_ICAO = {
@@ -67,31 +67,6 @@ AIRPORT_NAME_TO_ICAO = {
 	"Garry": "IGAR",
 	"Skopelos": "ISKP",
         "Bird Island": "IBRD",
-}
-
-ARPT_TO_CTR = {
-	'IRFD': "IRCC",
-	'IMLR': "IRCC",
-	'IGAR': "IRCC",
-	'IBLT': "IRCC",
-	'ITRC': "IRCC",
-	'ILAR': "ICCC",
-	'IPAP': "ICCC",
-	'IIAB': "ICCC",
-	'IHEN': "ICCC",
-	'IBAR': "ICCC",
-	'IZOL': "IZCC",
-	'IJAF': "IZCC",
-	'ISCM': "IZCC",
-	'ITKO': "IOCC",
-	'IDCS': "IOCC",
-        'IBRD': "IOCC",
-	'IPPH': "IPCC",
-	'ILKL': "IPCC",
-	'IBTH': "IBCC",
-	'ISKP': "IBCC",
-	'IGRV': "IGCC",
-	'ISAU': "ISCC",
 }
 
 CTR_TO_ARPT = {
@@ -644,60 +619,20 @@ def fetch_atc_data():
 
         active_arpt = get_active_arpts()
         filtered_controllers = []
-        for controller in controllers:
-            if controller.get("holder"):
-                active_arpt.append(CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")))
-
-            # Добавляем название позиции (например: IBCC_CTR)
-            position_name = f'{controller.get("airport")}_{controller.get("position")}'
+        for atc in controllers:
+            position_name = atc.get('airport', 'ZZZZ') + '_' + atc.get('position', 'ZZZ')
+            if atc['position'] == 'CTR':
+                position_name = AIRPORTS.get('fir', 'ZZZZ') + '_CTR'
             
             filtered_controllers.append({
                 "holder": controller.get("holder"),
-                "airport": CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport")),
-                "position": controller.get("position"),
+                "airport": controller.get("airport", 'ZZZZ'))),
+                "position": atc.get('position', 'ZZZ'),
                 "queue": controller.get("queue", []),
-                "frequency": FREQ_LIST.get(f'{controller.get("airport")}_{controller.get("position")}'),
-                "position_name": position_name  # Добавляем название позиции
+                "frequency": FREQ_LIST.get(position_name, ZZZ.ZZZ),
+                "position_name": position_name
             })
-
-        active_boys = {}
-        active_firs = []
-
-        for bigboy in filtered_controllers:
-            if bigboy["holder"] and bigboy["position"] == "CTR":
-                airport_icao = bigboy['airport']
-                if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
-                    fir_airport = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
-                    active_firs.append(fir_airport)
-
-                    active_boys[f"{airport_icao}_CTR"] = {
-                        "holder": bigboy["holder"],
-                        "queue": bigboy["queue"],
-                        "frequency": bigboy["frequency"],
-                        "position_name": bigboy["position_name"]
-                    }
-
-        major_arpt = 'ISAU IGRV ITKO IPPH IZOL ILAR IBTH IRFD'.split(' ')
-        print("Active FIRs:", ", ".join(active_firs))
-        controllers_copy = filtered_controllers.copy()
-
-        for mj in controllers_copy:
-            airport_icao = mj["airport"]
-            if airport_icao not in major_arpt:
-                if airport_icao in ARPT_TO_CTR and ARPT_TO_CTR[airport_icao] in CTR_TO_ARPT:
-                    fir = CTR_TO_ARPT[ARPT_TO_CTR[airport_icao]]
-                    if fir in active_firs:
-                        ctr_key = f"{fir}_CTR"
-                        if ctr_key in active_boys and airport_icao in active_arpt:
-                            filtered_controllers.append({
-                                "holder": active_boys[ctr_key]["holder"],
-                                "airport": airport_icao,
-                                "position": "CTR",
-                                "queue": active_boys[ctr_key]["queue"],
-                                "frequency": active_boys[ctr_key]["frequency"],
-                                "position_name": f"{airport_icao}_CTR"  # Добавляем название позиции
-                            })
-
+            
         position_priority = {'CTR': 0, 'TWR': 1, 'GND': 2}
 
         def sort_key(controller):
