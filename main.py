@@ -621,12 +621,13 @@ def fetch_atc_data():
         filtered_controllers = []
         for controller in controllers:
             position_name = controller.get('airport', 'ZZZZ') + '_' + controller.get('position', 'ZZZ')
+            arpt = CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport", 'ZZZZ'))
             if controller['position'] == 'CTR':
-                position_name = AIRPORTS.get('fir', 'ZZZZ') + '_CTR'
+                position_name = AIRPORTS[arpt].get('fir', 'ZZZZ') + '_CTR'
             
             filtered_controllers.append({
                 "holder": controller.get("holder"),
-                "airport": CTR_TO_ARPT.get(controller.get("airport"), controller.get("airport", 'ZZZZ')),
+                "airport": arpt,
                 "position": controller.get('position', 'ZZZ'),
                 "queue": controller.get("queue", []),
                 "frequency": FREQ_LIST.get(position_name, 'ZZZ.ZZZ'),
