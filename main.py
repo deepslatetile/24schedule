@@ -30,6 +30,9 @@ ATIS_UPDATE_INTERVAL = int(os.getenv("ATIS_UPDATE_INTERVAL", 30))
 WEBSOCKET_UPDATE_INTERVAL = int(os.getenv("WEBSOCKET_UPDATE_INTERVAL", 5))
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "wss://24data.ptfs.app/wss")
 
+DATA_TIMEOUT = timedelta(hours=2)
+LIVE_TIMEOUT = timedelta(seconds=15)
+
 # Раздельные хранилища для обычных и ивентовых данных
 dsr = {}  # Обычные рейсы
 edsr = {}  # Ивентовые рейсы
@@ -518,7 +521,6 @@ def get_flight_state(callsign, flight_data, event=False):
 def unalive_flights(event=False):
     current_time = datetime.now(timezone.utc)
     store = edsr if event else dsr
-
     for callsign, data in store.items():
         if data.get("live") and data.get("last_fresh_time"):
             if current_time - data["last_fresh_time"] > LIVE_TIMEOUT:
